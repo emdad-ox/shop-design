@@ -6,6 +6,12 @@
     "replace": "<div tabindex=\"0\" role=\"button\" data-pid=\"{{ item.id }}\" onclick=\"{{ item.open }}\""
   },
   {
+    "what": "WI-09 wishlist label beside heart on NEW products",
+    "count": 1,
+    "find": "aria-label=\"علاقه‌مندی\" style=\"{{ wishBtnStyle }}\">",
+    "replace": "aria-label=\"علاقه‌مندی\" style=\"{{ wishBtnStyle }}\"><sc-if value=\"{{ wishNew }}\" hint-placeholder-val=\"{{ false }}\"><span>{{ wishLabel }}</span></sc-if>"
+  },
+  {
     "what": "category chips focusable",
     "count": -1,
     "find": "onclick=\"{{ chip.pick }}\"",

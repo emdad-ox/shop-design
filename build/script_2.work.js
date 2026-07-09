@@ -39,7 +39,7 @@ class Component extends DCLogic {
     { id:'oxy10', title:'کپسول اکسیژن ۱۰ لیتری', cat:'cyl', gas:'اکسیژن طبی', price:3450000, vis:true, stock:11,
       desc:'کپسول ۱۰ لیتری سبک و جمع‌وجور برای استفاده خانگی؛ سازگار با مانومتر استاندارد و قابل شارژ مجدد در مجموعه امداد اکسیژن.',
       specs:[['حجم','۱۰ لیتر'],['فشار کاری','۱۵۰ بار'],['وزن تقریبی','۱۴ کیلوگرم'],['وضعیت تحویل','پر و پلمب']] },
-    { id:'oxy5', title:'کپسول اکسیژن ۵ لیتری پرتابل', cat:'cyl', gas:'اکسیژن طبی', price:2150000, vis:true, stock:4,
+    { id:'oxy5', title:'کپسول اکسیژن ۵ لیتری پرتابل', cat:'cyl', gas:'اکسیژن طبی', price:2150000, vis:true, stock:4, new:true,
       desc:'کپسول پرتابل ۵ لیتری همراه کیف حمل؛ مناسب جابه‌جایی بیمار و سفر. قابلیت شارژ سریع در محل مجموعه.',
       specs:[['حجم','۵ لیتر'],['فشار کاری','۱۵۰ بار'],['وزن تقریبی','۷ کیلوگرم'],['کیف حمل','دارد']] },
     { id:'conc', title:'دستگاه اکسیژن‌ساز ۵ لیتری', cat:'dev', gas:'اکسیژن‌ساز خانگی', price:0, vis:false, stock:3,
@@ -54,7 +54,7 @@ class Component extends DCLogic {
     { id:'co2', title:'کپسول CO₂ صنعتی ۲۰ لیتری', cat:'cyl', gas:'دی‌اکسید کربن', price:0, vis:false, stock:8,
       desc:'کپسول دی‌اکسید کربن صنعتی ۲۰ لیتری مناسب صنایع غذایی و جوشکاری؛ قیمت روز با استعلام اعلام می‌شود.',
       specs:[['حجم','۲۰ لیتر'],['کاربرد','صنعتی / غذایی'],['وضعیت تحویل','پر و پلمب']] },
-    { id:'nebu', title:'نبولایزر قابل حمل', cat:'dev', gas:'تجهیزات تنفسی', price:1780000, vis:true, stock:0,
+    { id:'nebu', title:'نبولایزر قابل حمل', cat:'dev', gas:'تجهیزات تنفسی', price:1780000, vis:true, stock:0, new:true,
       desc:'نبولایزر کمپرسوری قابل حمل با ماسک بزرگسال و کودک؛ مناسب داروهای استنشاقی.',
       specs:[['نوع','کمپرسوری'],['ماسک','بزرگسال + کودک'],['گارانتی','۱۲ ماه']] }
   ];
@@ -1285,7 +1285,13 @@ class Component extends DCLogic {
         this.setState({ wish: w }, () => this.morphHeart(nowWished));
       },
       wishFill: wished ? 'currentColor' : 'none',
-      wishBtnStyle: 'width:40px;height:40px;border-radius:999px;border:1px solid var(--line);background:var(--sur);cursor:pointer;display:grid;place-items:center;color:' + (wished ? 'var(--err)' : 'var(--tx2)'),
+      // WI-09 — for NEW products the icon-only heart gets a text label beside it (clarity for first-time items)
+      wishNew: !!cur.new,
+      wishLabel: wished ? 'ذخیره شد' : 'علاقه‌مندی',
+      wishBtnStyle: (cur.new
+        ? 'height:40px;padding:0 14px;gap:8px;display:inline-flex;align-items:center;'
+        : 'width:40px;height:40px;display:grid;place-items:center;')
+        + 'border-radius:999px;border:1px solid var(--line);background:var(--sur);cursor:pointer;font-size:13px;font-weight:600;white-space:nowrap;color:' + (wished ? 'var(--err)' : 'var(--tx2)'),
 
       cartItems,
       cartEmpty: t.count === 0, cartFull: t.count > 0,

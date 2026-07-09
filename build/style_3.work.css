@@ -202,8 +202,13 @@ button,[role="button"],a{ -webkit-tap-highlight-color: transparent; }
         (premium bottom-bar pattern; fixes the mid-scroll "CTA overlaps content" look) ---- */
 [style*="z-index:30"][style*="pointer-events:none"],
 [style*="z-index: 30"][style*="pointer-events: none"]{
-  padding-top: 34px;
-  background: linear-gradient(to top, var(--bg) 48%, transparent);
+  padding-top: 44px;   /* WI-05: taller seam so content clearly fades under the floating CTA */
+  background: linear-gradient(to top, var(--bg) 68%, transparent);
+}
+/* WI-05: give the floating CTA button itself a clear lift so it reads as detached/floating */
+[style*="z-index:30"][style*="pointer-events:none"] > button,
+[style*="z-index: 30"][style*="pointer-events: none"] > button{
+  box-shadow: 0 8px 28px -8px var(--glow), 0 1px 0 rgba(255,255,255,.18) inset !important;
 }
 
 /* ---- Loading spinner for submit CTAs (P6 lifecycle) ---- */
@@ -267,3 +272,36 @@ section[aria-label="چرا امداد اکسیژن"] > div:last-child > div:nth-
 /* WI-01 — Persian readable floor: nothing user-read below 12px */
 [style*="font-size:9.5px"],[style*="font-size:10px"],[style*="font-size:10.5px"],
 [style*="font-size:11px"],[style*="font-size:11.5px"]{ font-size: 12px !important; }
+
+/* WI-02 (reserve heavy, §1B) — primary CTAs keep real prominence: 700 + ≥15px, beating the
+   weight-collapse above via higher specificity. Primary CTA = teal fill. */
+button[style*="background:var(--p)"],button[style*="background: var(--p)"]{
+  font-weight: 700 !important; font-size: 15px !important;
+}
+
+/* WI-08 — the remaining pill chips authored inline (stock filter, sort) match chipBase now:
+   ≥40px tall, 15px label. (Category/gas chips already fixed at their chipBase source.) */
+button[style*="height:34px"][style*="border-radius:999px"]{
+  height: 40px !important; font-size: 15px !important; padding-inline: 16px !important;
+}
+
+/* WI-07 — product cards go MATTE so the price reads crisply over the aurora (light-first).
+   [data-pid] is on all 4 card variants; drop the backdrop blur and use an opaque surface.
+   Elevation/border stay (the --sur box-shadow hook still matches the inline style). */
+body{ --sur-solid:#f6faf9; }
+body[data-theme="dark"]{ --sur-solid:#122a2f; }
+[data-pid]{
+  background: var(--sur-solid) !important;
+  -webkit-backdrop-filter: none !important; backdrop-filter: none !important;
+}
+/* the price inside a card: pin to 700 + 15px so it's the anchor of the card */
+[data-pid] [style*="font-weight:800"]{ font-weight: 700 !important; font-size: 15px !important; }
+
+/* WI-04 — collapse off-scale radii onto the tier tokens (12/16/20/24); keep 999 pill and the
+   2px progress hairline. Overrides only the rendered value — inline literals stay, so the
+   entrance-animation selectors keyed on border-radius:14px still match. */
+[style*="border-radius:18px"],[style*="border-radius: 18px"]{ border-radius: 20px !important; }
+[style*="border-radius:14px"],[style*="border-radius: 14px"]{ border-radius: 16px !important; }
+[style*="border-radius:10px"],[style*="border-radius: 10px"],
+[style*="border-radius:9px"], [style*="border-radius: 9px"],
+[style*="border-radius:8px"], [style*="border-radius: 8px"]{ border-radius: 12px !important; }
