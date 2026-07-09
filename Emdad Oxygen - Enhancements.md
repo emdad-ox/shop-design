@@ -75,3 +75,27 @@ The app has a built-in red error overlay (bottom of screen) that catches **any**
 - **Product hero gallery (M4):** the detail hero is now a **swipeable 3-slide gallery** — the product illustration, a "key specs" slide, and an authenticity/standard slide — driven by GSAP Draggable + Inertia, with the dot indicators synced (drag to swipe, or tap a dot to jump). (There are no real product photos, so the slides are illustration + info rather than a photo carousel.)
 - **Reverse card-morph on Back (M3):** pressing Back from a product now **morphs the hero back down into the exact card it came from** (the reverse of the tap-to-open expand), instead of the plain slide. Off the detail screen it gracefully falls back to the back-slide.
 - All four verified end-to-end (structure, wiring, interpolation, snap logic). Note: gsap tweens auto-play in a normal foreground browser — in the backgrounded test harness the browser pauses requestAnimationFrame, so those were verified by seeking/interpolation + end-state rather than watching them play.
+
+## Update — UX review pass (8 epics, all verified end-to-end)
+A round of functional/UX fixes from a product review. Each was driven headlessly (Chrome, View-Transitions neutralized to test the reduced-motion path) through the real user flow.
+
+- **Price-inquiry flow reworked (no more instant submit):** inquiry-only products (اکسیژن‌ساز, CO₂) no longer fire a "sent" toast on tap. The card now opens the **product detail**, and the detail's «استعلام قیمت» opens a **confirm sheet** ("برای این محصول استعلام قیمت ثبت شود؟"); confirming records the request and shows the shared success screen. Reuses the existing sheet machinery (drag-to-dismiss, focus-trap, Escape, hardware-Back).
+- **Price-inquiry list:** inquiries are now a persisted record type with their own **«استعلام‌های قیمت»** screen + a profile menu row (previously there was no list for them).
+- **Referrer-aware Back:** opening a service form (شارژ کپسول / فروش دست دوم) from **Home** now returns to Home on Back — the back arrow was hardcoded to Services. Origin is tracked so the arrow mirrors the hardware-Back target.
+- **Digit-only phone inputs:** all four phone fields (checkout, login, refill, used-sale) now sanitize to digits live (Persian→Latin, non-digits stripped) — previously only the price field did.
+- **Discount moved cart → checkout:** the code input is gone from the cart; it now lives in the **checkout step (after login)**, where the cart flow requires login before checkout. Discount is cleared whenever you land on the cart.
+- **Itemized order detail / invoice:** orders now snapshot their **line items, amounts, discount, address and delivery**. After checkout you land on a clear **itemized order-detail page** (not the orders list); it doubles as the success moment. Orders-list rows are tappable to reopen that invoice later.
+- **Per-request detail:** requests-list rows are tappable and open a **جزئیات درخواست** page (gas / price / delivery / notes); refill & used records were enriched to carry those fields.
+- **Empty-cart guidance:** clearer copy + two weighted CTAs (مشاهده محصولات primary, خدمات ما secondary).
+- **Global support FAB:** a persistent floating call button (شبانه‌روزی `tel:`) on every screen — high-value for medical-oxygen users.
+
+Build stays green (all exact-match markup edits resolve `x1`, except the two service-form back buttons which intentionally match `x2`).
+
+### HoPD polish pass (follow-up review)
+- **Services page now focuses on services:** the global "emergency order" hotline banner was removed from the services screen (the support number lives in the FAB now) and replaced with a services-focused guidance strip; the primary service card (شارژ کپسول) is emphasized with an accent border.
+- **Invoice framing:** the order-detail page now clearly states it is a **پیش‌فاکتور** (no online payment happened; amount & delivery finalized by phone), addressing "روی اون صفحه بیشتر باید کار بشه".
+- **Support FAB fixes:** unified to the real support number (`0919 100 2030`) and repositioned to **lift above the full-width bottom CTAs** (detail/cart/checkout/forms) so it never overlaps them; rests just above the nav elsewhere.
+
+### Bottom-sheet "disappears after open" fix
+Every bottom sheet (filter/sort, address picker, price-inquiry confirm) would slide up and then vanish a moment later. Cause: `manageSheetDrag` did `gsap.set(panel, { y: 0, clearProps: 'transform' })` before creating the drag handler — clearing the transform made `Draggable.create()` snapshot the `sheetIn` entrance animation's **start** value (translateY 100%) and pin the panel there via inline `translate3d(0, <panelHeight>, 0)`; once the CSS animation finished the panel reverted to that off-screen offset. Fixed by keeping the inline `y:0` (removed `clearProps`), so Draggable reads 0 and the sheet rests correctly. Verified: the panel's resting inline transform is now `translate3d(0px, 0px, 0px)` instead of `translate3d(0px, 395px, 0px)`.
+- Also (same review): sort/in-stock picks **inside** the open filter sheet now use a plain `setState` instead of a View-Transitions list-flip (the flip painted the product cards over the open sheet); page chips keep their animation. The filter button also got an `aria-label`.

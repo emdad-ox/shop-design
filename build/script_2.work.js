@@ -3,6 +3,7 @@ class Component extends DCLogic {
   state = {
     route: 'home', theme: null, pid: null, qty: 1, cart: {}, wish: {},
     cat: 'all', q: '', inStock: false, sort: 'new', sheet: false,
+    inqSheet: false, inqPid: null,
     disc: null, discInput: '', discErr: '',
     addrId: 1, phone: '', note: '',
     addresses: [
@@ -12,12 +13,14 @@ class Component extends DCLogic {
     nextAddrId: 3, addrSheet: null, addrSheetTarget: null, adEditId: null, adTitle: '', adText: '', adErr: '', addrMenuId: null,
     adLat: 35.7219, adLng: 51.3347,
     orderNo: null, toastMsg: '', toastShow: false,
+    svcReturn: 'services',   // origin route to return to from a service form (Epic 1: referrer-aware Back)
+    odId: null, odFresh: false, rqCode: null,   // selected order / just-placed flag / selected request (Epic 3+5, 4)
     // auth
     loggedIn: false, userName: '', authStep: 'phone', authPhone: '', otp: '', authErr: '',
     resendIn: 0, authReturn: null, authFrom: 'profile', pendingSubmit: null,
     editingName: false, nameInput: '',
     // records
-    orders: [], requests: [], busy: '',
+    orders: [], requests: [], inquiries: [], busy: '',
     // delivery scheduling (P7)
     coDay: 0, coSlot: '',
     // refill form
@@ -68,7 +71,7 @@ class Component extends DCLogic {
 
   STORE_KEY = 'emdad:v1';
   SCHEMA_V = 2;
-  DURABLE = ['cart','wish','addresses','nextAddrId','orders','requests','loggedIn','userName','phone','addrId','theme'];
+  DURABLE = ['cart','wish','addresses','nextAddrId','orders','requests','inquiries','loggedIn','userName','phone','addrId','theme'];
   ART_OF = { oxy40:'cyl', oxy10:'cyl', oxy5:'cyl', co2:'cyl', conc:'dev', nebu:'dev', mano:'mano', mask:'mask' };
   PRODUCT_ART = {
     cyl: '<svg viewBox="0 0 96 96" width="56%" height="56%" fill="none" stroke="currentColor" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"><rect x="32" y="26" width="32" height="58" rx="16" fill="currentColor" fill-opacity=".1"/><path d="M43 26v-5a5 5 0 0 1 10 0v5"/><rect x="41" y="12" width="14" height="8" rx="2" fill="currentColor" fill-opacity=".1"/><path d="M32 44h32M32 68h32"/></svg>',
@@ -96,7 +99,7 @@ class Component extends DCLogic {
     try { history.replaceState({ eoRoute: this.state.route, pid: this.state.pid }, ''); } catch (e) {}
     this._lastRoute = this.state.route; this._lastOverlay = false;
     this._onPop = (e) => {
-      if (this.state.sheet || this.state.addrSheet) { this._navSource = 'pop'; this.closeOverlays(); return; }
+      if (this.state.sheet || this.state.addrSheet || this.state.inqSheet) { this._navSource = 'pop'; this.closeOverlays(); return; }
       const st = e.state || {};
       this._navSource = 'pop';
       this.go({ route: st.eoRoute || 'home', pid: st.pid });
@@ -164,7 +167,7 @@ class Component extends DCLogic {
     }
     // Opening a bottom-sheet pushes a disposable history entry so hardware Back closes the sheet
     // instead of leaving the route (P3 overlay layer).
-    const ovNow = !!(this.state.sheet || this.state.addrSheet);
+    const ovNow = !!(this.state.sheet || this.state.addrSheet || this.state.inqSheet);
     if (ovNow && !this._lastOverlay && this._navSource !== 'pop') { try { history.pushState({ eoRoute: this.state.route, pid: this.state.pid, overlay: true }, ''); } catch (e) {} }
     this._lastOverlay = ovNow;
     this._lastRoute = this.state.route;
@@ -199,7 +202,7 @@ class Component extends DCLogic {
     if (!d || typeof d !== 'object') return false;
     const patch = {};
     this.DURABLE.forEach(k => { if (d[k] !== undefined) patch[k] = d[k]; });
-    if (d.v !== this.SCHEMA_V) { delete patch.orders; delete patch.requests; }   // version gate: drop stale records
+    if (d.v !== this.SCHEMA_V) { delete patch.orders; delete patch.requests; delete patch.inquiries; }   // version gate: drop stale records
     const ids = new Set(this.PRODUCTS.map(p => p.id));
     if (patch.cart && typeof patch.cart === 'object') { const c = {}; Object.keys(patch.cart).forEach(id => { if (ids.has(id) && patch.cart[id] > 0) c[id] = patch.cart[id]; }); patch.cart = c; }
     if (patch.wish && typeof patch.wish === 'object') { const w = {}; Object.keys(patch.wish).forEach(id => { if (ids.has(id)) w[id] = patch.wish[id]; }); patch.wish = w; }
@@ -320,7 +323,10 @@ class Component extends DCLogic {
   // would sever the letter joins and shatter the word forms.
   manageSuccessFx() {
     const route = this.state.route;
-    if (route !== 'success' && route !== 'formSuccess') { this._fxRoute = null; return; }
+    // Celebrate on the classic success/formSuccess screens, and on a FRESHLY placed order detail
+    // (Epic 3+5: checkout now lands on the itemized order-detail page, which doubles as the success moment).
+    const celebrate = route === 'success' || route === 'formSuccess' || (route === 'orderDetail' && this.state.odFresh);
+    if (!celebrate) { this._fxRoute = null; return; }
     if (this._fxRoute === route) return;
     this._fxRoute = route;
     if (!this._gsapReady || !window.gsap) return;
@@ -355,7 +361,11 @@ class Component extends DCLogic {
     if (this._sheetDrag && this._sheetDragEl === panel && document.body.contains(panel)) return;
     if (this._sheetDrag) { this._sheetDrag.kill(); this._sheetDrag = null; }
     this._sheetDragEl = panel;
-    g.set(panel, { y: 0, clearProps: 'transform' });
+    // Pin the resting position to y:0 and KEEP it inline (do NOT clearProps). Clearing the transform
+    // here removed the inline y, so Draggable.create() snapshotted the `sheetIn` entrance animation's
+    // start value (translateY 100%) and pinned the panel off-screen — the sheet slid up then reverted
+    // to that offset and "disappeared" a moment after opening. Keeping y:0 makes Draggable read 0.
+    g.set(panel, { y: 0 });
     this._sheetDrag = window.Draggable.create(panel, {
       type: 'y', bounds: { minY: 0, maxY: window.innerHeight },
       inertia: !!window.InertiaPlugin, dragClickables: false, cursor: 'grab', activeCursor: 'grabbing',
@@ -441,9 +451,10 @@ class Component extends DCLogic {
   todayFa() { return new Intl.DateTimeFormat('fa-IR', { day: 'numeric', month: 'long', year: 'numeric' }).format(new Date()); }
   // ---------- order/request lifecycle (P6) ----------
   STAGES = {
-    order:  ['ثبت سفارش', 'در حال آماده‌سازی', 'ارسال شد', 'تحویل شد'],
-    refill: ['ثبت درخواست', 'جمع‌آوری کپسول', 'در حال شارژ', 'تحویل شد'],
-    used:   ['ثبت درخواست', 'در حال بررسی', 'قیمت‌گذاری', 'تکمیل شد'],
+    order:   ['ثبت سفارش', 'در حال آماده‌سازی', 'ارسال شد', 'تحویل شد'],
+    refill:  ['ثبت درخواست', 'جمع‌آوری کپسول', 'در حال شارژ', 'تحویل شد'],
+    used:    ['ثبت درخواست', 'در حال بررسی', 'قیمت‌گذاری', 'تکمیل شد'],
+    inquiry: ['ثبت استعلام', 'در حال بررسی', 'قیمت‌گذاری', 'اعلام قیمت'],
   };
   // Demo-paced fulfilment: a fresh record sits at stage 1, then advances over real elapsed
   // time (persisted ts keeps progressing across reloads). Clamped to the final stage.
@@ -463,6 +474,38 @@ class Component extends DCLogic {
       chipStyle: 'font-size:10.5px;font-weight:700;padding:4px 12px;border-radius:999px;color:'
         + (final ? 'var(--ok)' : 'var(--p)') + ';background:' + (final ? 'var(--ok-soft)' : 'var(--p-soft)'),
       dot1: dot(1), dot2: dot(2), dot3: dot(3), dot4: dot(4), seg1: seg(1), seg2: seg(2), seg3: seg(3),
+    };
+  }
+  // ---------- order / request detail view-models (Epic 3+5, 4) ----------
+  // Flat, prefixed view-models for the invoice (od*) and request-detail (rd*) screens. Both read
+  // from the persisted snapshot the commit/complete methods stored, so a detail opened later shows
+  // exactly what was ordered/requested.
+  orderVM(o) {
+    if (!o) return {};
+    const st = this.stepperVM('order', o.ts);
+    return {
+      odNo: o.no, odDate: o.date, odDelivery: o.delivery || 'هماهنگی تلفنی',
+      odItems: (o.items || []).map(it => ({ title: it.title, qtyFa: this.fmt(it.qty), lineLabel: this.fmt(it.line) })),
+      odSubtotalLabel: this.fmt(o.subtotal != null ? o.subtotal : o.total),
+      odHasDisc: (o.disc || 0) > 0, odDiscLabel: this.fmt(o.disc || 0), odDiscCode: o.discCode || '',
+      odTotalLabel: this.fmt(o.total),
+      odAddrTitle: o.addrTitle || '', odAddrText: o.addrText || '', odHasAddr: !!o.addrText,
+      odNote: o.note || '', odHasNote: !!(o.note && o.note.trim()),
+      odChipStyle: st.chipStyle, odChipText: st.chipText, odStageLabel: st.stageLabel, odStepLabel: st.stepLabel,
+    };
+  }
+  requestVM(r) {
+    if (!r) return {};
+    const st = this.stepperVM(r.kind, r.ts);
+    return {
+      rdKind: r.kind === 'refill' ? 'شارژ کپسول گاز' : 'فروش دست دوم',
+      rdCode: r.code, rdDate: r.date,
+      rdDelivery: r.delivery || '', rdHasDelivery: !!(r.kind === 'refill' && r.delivery),
+      rdGas: r.gas || '', rdHasGas: !!r.gas,
+      rdPrice: r.price ? this.fmt(r.price) : '', rdHasPrice: !!r.price,
+      rdDesc: r.desc || '', rdHasDesc: !!(r.desc && r.desc.trim()),
+      rdNotes: r.notes || '', rdHasNotes: !!(r.notes && r.notes.trim()),
+      rdChipStyle: st.chipStyle, rdChipText: st.chipText, rdStageLabel: st.stageLabel, rdStepLabel: st.stepLabel,
     };
   }
   // ---------- delivery scheduling (P7) ----------
@@ -497,9 +540,9 @@ class Component extends DCLogic {
     this._toastT = setTimeout(() => this.setState({ toastShow: false }), 2400);
   }
 
-  DEPTH = { home:0, products:0, services:0, cart:0, profile:0, detail:1, checkout:1, auth:1, refill:1, usedSale:1, orders:1, requests:1, addresses:1, wishlist:1, success:2, formSuccess:2 };
+  DEPTH = { home:0, products:0, services:0, cart:0, profile:0, detail:1, checkout:1, auth:1, refill:1, usedSale:1, orders:1, requests:1, inquiries:1, addresses:1, wishlist:1, orderDetail:2, requestDetail:2, success:2, formSuccess:2 };
   TAB_ORDER = ['home', 'products', 'services', 'cart', 'profile'];
-  ROUTE_TAB = { home:'home', products:'products', detail:'products', cart:'cart', checkout:'cart', success:'cart', services:'services', refill:'services', usedSale:'services', formSuccess:'services', profile:'profile', orders:'profile', requests:'profile', addresses:'profile', wishlist:'profile', auth:'profile' };
+  ROUTE_TAB = { home:'home', products:'products', detail:'products', cart:'cart', checkout:'cart', success:'cart', services:'services', refill:'services', usedSale:'services', formSuccess:'services', profile:'profile', orders:'profile', requests:'profile', inquiries:'profile', orderDetail:'profile', requestDetail:'profile', addresses:'profile', wishlist:'profile', auth:'profile' };
   tabOf(route) { return this.ROUTE_TAB[route] || 'home'; }
   // Wrap a route change in a directional View Transition (SPA equivalent of @view-transition).
   nav(patch, dir) {
@@ -730,6 +773,7 @@ class Component extends DCLogic {
   closeOverlays() {
     const s = this.state;
     if (s.addrSheet) this.setState({ addrSheet: null, addrSheetTarget: null });
+    else if (s.inqSheet) this.setState({ inqSheet: false, inqPid: null });
     else if (s.sheet) this.setState({ sheet: false });
     else if (s.addrMenuId != null) this.setState({ addrMenuId: null });
   }
@@ -817,7 +861,7 @@ class Component extends DCLogic {
       canAdd: show && p.stock > 0,
       open: (e) => this.openMorph(p.id, e),
       add: (e) => { if (e && e.stopPropagation) e.stopPropagation(); if (p.stock > 0) { const c = e && e.currentTarget && e.currentTarget.closest('[data-pid]'); this.addToCart(p.id, 1, c && c.firstElementChild); } },
-      inquire: (e) => { if (e && e.stopPropagation) e.stopPropagation(); this.toast('درخواست استعلام ثبت شد؛ کارشناسان با شما تماس می‌گیرند'); },
+      inquire: (e) => { if (e && e.stopPropagation) e.stopPropagation(); this.setState({ inqSheet: true, inqPid: p.id }); },
       unwish: (e) => { if (e && e.stopPropagation) e.stopPropagation(); const w = { ...this.state.wish }; delete w[p.id]; this.vtState({ wish: w }); }
     };
   }
@@ -865,7 +909,7 @@ class Component extends DCLogic {
     if (!this.commitGuard()) return;
     const c = this.code('RC');
     this.go({
-      requests: [{ kind: 'refill', code: c, date: this.todayFa(), ts: Date.now(), delivery: this.deliveryLabel(this.state.rfDay, this.state.rfSlot) }, ...this.state.requests],
+      requests: [{ kind: 'refill', code: c, date: this.todayFa(), ts: Date.now(), delivery: this.deliveryLabel(this.state.rfDay, this.state.rfSlot), gas: this.state.rfGas, notes: this.state.rfNotes }, ...this.state.requests],
       route: 'formSuccess', fsKind: 'refill', fsCode: c, busy: '',
       rfPhotoList: [], rfGas: '', rfDelivery: '', rfAddr: '', rfNotes: '', rfDay: 0, rfSlot: '', rfErrs: {}
     });
@@ -874,11 +918,24 @@ class Component extends DCLogic {
     if (!this.commitGuard()) return;
     const c = this.code('US');
     this.go({
-      requests: [{ kind: 'used', code: c, date: this.todayFa(), ts: Date.now() }, ...this.state.requests],
+      requests: [{ kind: 'used', code: c, date: this.todayFa(), ts: Date.now(), price: parseInt(this.deFa(this.state.usPrice) || '0', 10), desc: this.state.usDesc }, ...this.state.requests],
       route: 'formSuccess', fsKind: 'used', fsCode: c, busy: '',
       usPhotoList: [], usPrice: '', usDesc: '', usErrs: {}
     });
   }
+  // Price-inquiry confirm→commit: the detail CTA opens a confirm sheet (state.inqSheet); confirming
+  // here records the inquiry (like a refill/used request) and lands on the shared formSuccess screen.
+  // No instant submit anywhere — the card opens detail, detail opens this sheet.
+  confirmInquiry = () => {
+    const p = this.PRODUCTS.find(x => x.id === this.state.inqPid);
+    if (!p) { this.setState({ inqSheet: false, inqPid: null }); return; }
+    if (!this.commitGuard()) return;
+    const c = this.code('IQ');
+    this.go({
+      inquiries: [{ pid: p.id, title: p.title, code: c, date: this.todayFa(), ts: Date.now() }, ...this.state.inquiries],
+      route: 'formSuccess', fsKind: 'inquiry', fsCode: c, inqSheet: false, inqPid: null, busy: ''
+    });
+  };
   submitRefill = () => {
     if (this.state.busy) return;
     const s = this.state, errs = {};
@@ -971,14 +1028,26 @@ class Component extends DCLogic {
   };
   _commitOrder() {
     if (this.state.busy !== 'order') return;
-    const t = this.cartTotals();
+    const s = this.state, t = this.cartTotals();
     const parts = new Intl.DateTimeFormat('en-u-ca-persian', { year: 'numeric', month: '2-digit' }).formatToParts(new Date());
     const y = parts.find(x => x.type === 'year').value;
     const m = parts.find(x => x.type === 'month').value;
     const no = 'EO-' + String(y).slice(-4) + m + '-' + String(Math.floor(1000 + Math.random() * 9000));
+    // Epic 3+5: snapshot the line items, amounts and address INTO the order so the invoice/detail
+    // page can show exactly what was ordered — even much later, and even after the cart is cleared.
+    const items = Object.entries(s.cart).map(([id, qty]) => { const p = this.PRODUCTS.find(x => x.id === id); return { title: p.title, qty, line: p.price * qty }; });
+    const addr = s.addresses.find(a => a.id === s.addrId) || s.addresses[0] || null;
+    const order = {
+      no, date: this.todayFa(), ts: Date.now(), count: t.count,
+      subtotal: t.subtotal, disc: t.disc, discCode: s.disc || '', total: t.total,
+      items, note: s.note || '', addrTitle: addr ? addr.title : '', addrText: addr ? addr.text : '',
+      delivery: this.deliveryLabel(s.coDay, s.coSlot)
+    };
+    // Land on the itemized order-detail page (odFresh → shows the success moment), NOT the orders list.
     this.go({
-      route: 'success', orderNo: no, cart: {}, disc: null, discInput: '', note: '', busy: '', coSlot: '', coDay: 0,
-      orders: [{ no, date: this.todayFa(), ts: Date.now(), count: t.count, total: t.total, delivery: this.deliveryLabel(this.state.coDay, this.state.coSlot) }, ...this.state.orders]
+      route: 'orderDetail', odId: no, odFresh: true, orderNo: no,
+      cart: {}, disc: null, discInput: '', note: '', busy: '', coSlot: '', coDay: 0,
+      orders: [order, ...s.orders]
     });
   }
 
@@ -1011,7 +1080,7 @@ class Component extends DCLogic {
       : 'flex:none;font-size:10.5px;font-weight:700;color:var(--err);background:var(--err-soft);padding:4px 12px;border-radius:999px';
     const wished = !!s.wish[cur.id];
 
-    const chipBase = 'height:34px;padding:0 var(--sp-4);border-radius:var(--r-pill);font-size:var(--fs-caption);font-weight:var(--w-title);cursor:pointer;';
+    const chipBase = 'height:40px;padding:0 var(--sp-5);border-radius:var(--r-pill);font-size:var(--fs-sub);font-weight:var(--w-strong);cursor:pointer;';
     const catChips = this.CATS.map(c => ({
       label: c.label,
       pick: () => this.vtState({ cat: c.id }),
@@ -1038,7 +1107,9 @@ class Component extends DCLogic {
     const sortDefs = [['new', 'جدیدترین'], ['cheap', 'ارزان‌ترین'], ['exp', 'گران‌ترین']];
     const sortOpts = sortDefs.map(([id, label]) => ({
       label,
-      pick: () => this.vtState({ sort: id }),
+      // Sort is only picked from inside the (open) filter sheet — the list is hidden behind it, so a
+      // list-flip View Transition would just paint the cards over the sheet. Plain setState instead.
+      pick: () => this.setState({ sort: id }),
       dotStyle: 'flex:none;width:14px;height:14px;border-radius:var(--r-pill);' + (s.sort === id ? 'border:4px solid var(--p);background:var(--sur)' : 'border:2px solid var(--tx2);background:none'),
       labelStyle: 'font-size:13px;' + (s.sort === id ? 'font-weight:800;color:var(--tx)' : 'font-weight:500;color:var(--tx2)')
     }));
@@ -1107,14 +1178,14 @@ class Component extends DCLogic {
       { key: 'home', label: 'خانه', d: 'M3 10.5L12 3l9 7.5V20a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1z', go: () => this.go({ route: 'home' }) },
       { key: 'products', label: 'محصولات', d: 'M4 4h7v7H4zM13 4h7v7h-7zM4 13h7v7H4zM13 13h7v7h-7z', go: () => this.go({ route: 'products' }) },
       { key: 'services', label: 'خدمات', d: 'M12 3a9 9 0 1 0 0 18 9 9 0 0 0 0-18M12 8v8M8 12h8', go: () => this.go({ route: 'services' }) },
-      { key: 'cart', label: 'سبد', d: 'M6 6h15l-1.5 9H7.5L6 6zM6 6L5 3H2M9.5 20.5a.6.6 0 1 1 0-1.2.6.6 0 0 1 0 1.2M17.5 20.5a.6.6 0 1 1 0-1.2.6.6 0 0 1 0 1.2', go: () => this.go({ route: 'cart' }) },
+      { key: 'cart', label: 'سبد', d: 'M6 6h15l-1.5 9H7.5L6 6zM6 6L5 3H2M9.5 20.5a.6.6 0 1 1 0-1.2.6.6 0 0 1 0 1.2M17.5 20.5a.6.6 0 1 1 0-1.2.6.6 0 0 1 0 1.2', go: () => this.go({ route: 'cart', disc: null, discInput: '', discErr: '' }) },
       { key: 'profile', label: 'پروفایل', d: 'M12 12a4 4 0 1 0 0-8 4 4 0 0 0 0 8zM5 21a7 7 0 0 1 14 0', go: () => this.go({ route: 'profile' }) }
     ];
     const activeMap = {
       home: 'home', products: 'products', detail: 'products',
       cart: 'cart', checkout: 'cart', success: 'cart',
       services: 'services', refill: 'services', usedSale: 'services', formSuccess: 'services',
-      profile: 'profile', orders: 'profile', requests: 'profile', addresses: 'profile', wishlist: 'profile', auth: 'profile'
+      profile: 'profile', orders: 'profile', requests: 'profile', inquiries: 'profile', orderDetail: 'profile', requestDetail: 'profile', addresses: 'profile', wishlist: 'profile', auth: 'profile'
     };
     const activeKey = route === 'auth' ? (activeMap[s.authFrom] || 'profile') : (activeMap[route] || 'home');
     const pillIdx = Math.max(0, this.TAB_ORDER.indexOf(activeKey));
@@ -1134,19 +1205,24 @@ class Component extends DCLogic {
     const menuRows = [
       { label: 'سفارش‌های من', d: 'M4 7h16l-1.5 13h-13L4 7zM8 7a4 4 0 0 1 8 0', go: () => this.go({ route: 'orders' }), count: this.fmt(s.orders.length), hasCount: s.orders.length > 0 },
       { label: 'درخواست‌های خدمت', d: 'M9 3h6M12 3v4M8 7h8v13a1 1 0 0 1-1 1H9a1 1 0 0 1-1-1z', go: () => this.go({ route: 'requests' }), count: this.fmt(s.requests.length), hasCount: s.requests.length > 0 },
+      { label: 'استعلام‌های قیمت', d: 'M11 4a7 7 0 1 0 0 14 7 7 0 0 0 0-14zM20 21l-4.35-4.35', go: () => this.go({ route: 'inquiries' }), count: this.fmt(s.inquiries.length), hasCount: s.inquiries.length > 0 },
       { label: 'علاقه‌مندی‌ها', d: 'M12 20.5s-7.2-4.6-9.3-8.4C1 9.1 2.7 6.2 5.7 5.8c1.9-.3 3.5.6 4.4 2h3.8c.9-1.4 2.5-2.3 4.4-2 3 .4 4.7 3.3 3 6.3-2.1 3.8-9.3 8.4-9.3 8.4z', go: () => this.go({ route: 'wishlist' }), count: this.fmt(Object.keys(s.wish).length), hasCount: Object.keys(s.wish).length > 0 },
       { label: 'آدرس‌های من', d: 'M12 21s-7-5.3-7-11a7 7 0 0 1 14 0c0 5.7-7 11-7 11zM12 12.5a2.5 2.5 0 1 0 0-5 2.5 2.5 0 0 0 0 5z', go: () => this.go({ route: 'addresses' }), count: this.fmt(s.addresses.length), hasCount: true }
     ];
 
     const wishIds = Object.keys(s.wish);
     const price = parseInt(this.deFa(s.usPrice) || '0', 10);
+    // Support FAB: lift it above the full-width fixed bottom CTA on screens that have one, so the
+    // two never overlap; otherwise it rests just above the bottom nav.
+    const hasBottomCta = (route === 'cart' && t.count > 0) || route === 'checkout' || (route === 'detail' && (curVm.canAdd || curVm.out)) || route === 'refill' || route === 'usedSale';
+    const fabStyle = 'position:fixed;z-index:40;inset-inline-end:16px;bottom:calc(' + (hasBottomCta ? '150px' : '86px') + ' + env(safe-area-inset-bottom));width:54px;height:54px;border-radius:999px;background:linear-gradient(180deg,var(--p),var(--p-deep));color:#fff;display:grid;place-items:center;box-shadow:0 12px 26px -6px var(--glow);text-decoration:none';
 
     return {
       isHome: route === 'home', isProducts: route === 'products', isDetail: route === 'detail',
       isCart: route === 'cart', isCheckout: route === 'checkout', isSuccess: route === 'success',
       isAuth: route === 'auth', isServices: route === 'services', isRefill: route === 'refill',
       isUsed: route === 'usedSale', isFormSuccess: route === 'formSuccess',
-      isProfile: route === 'profile', isOrders: route === 'orders', isRequests: route === 'requests',
+      isProfile: route === 'profile', isOrders: route === 'orders', isRequests: route === 'requests', isInquiries: route === 'inquiries',
       isAddresses: route === 'addresses', isWishlist: route === 'wishlist',
       isDark: dark, isLight: !dark, isLogged: logged, isGuest: !logged,
       toggleTheme: (e) => this.themeVT(e, dark ? 'light' : 'dark'),
@@ -1154,13 +1230,23 @@ class Component extends DCLogic {
       // Back from detail reverse-morphs the hero into its originating card thumbnail (M3); off the
       // detail route [data-hero-img] is absent so morphTo falls back to the plain back cover-slide.
       goProducts: () => this.morphTo({ route: 'products' }, document.querySelector('[data-hero-img]'), '[data-pid="' + s.pid + '"] > :first-child', 'hero-img'),
-      goCart: () => this.go({ route: 'cart' }),
+      // Epic 9: discount is a checkout-only concern — clear it whenever we land on the cart so the
+      // cart never shows a discount and re-entering checkout requires re-applying the code.
+      goCart: () => this.go({ route: 'cart', disc: null, discInput: '', discErr: '' }),
       goServices: () => this.go({ route: 'services' }),
-      goRefill: () => this.morphTo({ route: 'refill', rfPhone: logged ? s.phone : s.rfPhone }, document.querySelector('[data-svc="refill"]'), '[data-form-hero="refill"]', 'svc-morph'),
-      goUsed: () => this.morphTo({ route: 'usedSale', usPhone: logged ? s.phone : s.usPhone }, document.querySelector('[data-svc="used"]'), '[data-form-hero="used"]', 'svc-morph'),
+      goRefill: () => this.morphTo({ route: 'refill', svcReturn: route, rfPhone: logged ? s.phone : s.rfPhone }, document.querySelector('[data-svc="refill"]'), '[data-form-hero="refill"]', 'svc-morph'),
+      goUsed: () => this.morphTo({ route: 'usedSale', svcReturn: route, usPhone: logged ? s.phone : s.usPhone }, document.querySelector('[data-svc="used"]'), '[data-form-hero="used"]', 'svc-morph'),
+      // Epic 1: Back from a service form returns to wherever it was opened from (Home or Services),
+      // not a hardcoded Services — mirrors the hardware-Back behaviour so the two are consistent.
+      backFromSvc: () => this.go({ route: s.svcReturn || 'services' }),
       goProfile: () => this.go({ route: 'profile' }),
       goOrders: () => this.go({ route: 'orders' }),
       goRequests: () => this.go({ route: 'requests' }),
+      goInquiries: () => this.go({ route: 'inquiries' }),
+      inqSheetOpen: s.inqSheet,
+      inqProductTitle: (this.PRODUCTS.find(p => p.id === s.inqPid) || {}).title || '',
+      closeInqSheet: () => this.setState({ inqSheet: false, inqPid: null }),
+      confirmInquiry: this.confirmInquiry,
       goCheckout: () => {
         if (!logged) { this.goAuthFor('checkout', 'cart'); this.toast('برای ثبت سفارش ابتدا وارد شوید'); }
         else this.go({ route: 'checkout' });
@@ -1175,7 +1261,9 @@ class Component extends DCLogic {
       q: s.q, onQ: (e) => this.setState({ q: e.target.value }),
       catChips, sortOpts, gasChips, deliveryOpts,
       inStock: s.inStock,
-      toggleStock: () => this.vtState({ inStock: !s.inStock }),
+      // Same control lives both as a page chip (animate the list) and inside the filter sheet (plain,
+      // since the list is hidden behind the sheet — avoids the flip painting over the open sheet).
+      toggleStock: () => this.state.sheet ? this.setState({ inStock: !this.state.inStock }) : this.vtState({ inStock: !this.state.inStock }),
       sheet: s.sheet,
       openSheet: () => this.setState({ sheet: true }),
       closeSheet: () => this.setState({ sheet: false }),
@@ -1236,7 +1324,7 @@ class Component extends DCLogic {
       adTitle: s.adTitle, onAdTitle: (e) => this.setState({ adTitle: e.target.value, adErr: '' }),
       adText: s.adText, onAdText: (e) => this.setState({ adText: e.target.value, adErr: '' }),
       adErr: s.adErr, saveAddr: this.saveAddr,
-      phone: s.phone, onPhone: (e) => this.setState({ phone: e.target.value }),
+      phone: s.phone, onPhone: (e) => this.setState({ phone: this.deFa(e.target.value) }),
       note: s.note, onNote: (e) => this.setState({ note: e.target.value }),
       placeOrder: this.placeOrder,
       // busy-aware submit CTAs (P6 loading states)
@@ -1252,7 +1340,7 @@ class Component extends DCLogic {
 
       // auth
       authPhoneStep: s.authStep === 'phone', authCodeStep: s.authStep === 'code',
-      authPhone: s.authPhone, onAuthPhone: (e) => this.setState({ authPhone: e.target.value, authErr: '' }),
+      authPhone: s.authPhone, onAuthPhone: (e) => this.setState({ authPhone: this.deFa(e.target.value), authErr: '' }),
       otp: s.otp, onOtp: (e) => this.setState({ otp: e.target.value.slice(0, 6), authErr: '' }),
       authErr: s.authErr,
       sendOtp: this.sendOtp, verifyOtp: this.verifyOtp,
@@ -1266,7 +1354,7 @@ class Component extends DCLogic {
       rfTiles, rfCanAddPhoto: s.rfPhotoList.length < 3, rfPickFile: this.rfPickFile,
       rfNeedsAddr: s.rfDelivery !== 'store',
       rfAddr: s.rfAddr, onRfAddr: (e) => this.setState({ rfAddr: e.target.value, rfErrs: { ...s.rfErrs, addr: '' } }),
-      rfPhone: s.rfPhone, onRfPhone: (e) => this.setState({ rfPhone: e.target.value, rfErrs: { ...s.rfErrs, phone: '' } }),
+      rfPhone: s.rfPhone, onRfPhone: (e) => this.setState({ rfPhone: this.deFa(e.target.value), rfErrs: { ...s.rfErrs, phone: '' } }),
       rfNotes: s.rfNotes, onRfNotes: (e) => this.setState({ rfNotes: e.target.value }),
       rfErrPhotos: s.rfErrs.photos || '', rfErrGas: s.rfErrs.gas || '', rfErrDelivery: s.rfErrs.delivery || '',
       rfErrAddr: s.rfErrs.addr || '', rfErrPhone: s.rfErrs.phone || '', rfErrSlot: s.rfErrs.slot || '',
@@ -1278,7 +1366,7 @@ class Component extends DCLogic {
       usTiles, usCanAddPhoto: s.usPhotoList.length < 5, usPickFile: this.usPickFile,
       usPriceLabel: price > 0 ? this.fmt(price) : '',
       onUsPrice: (e) => this.setState({ usPrice: this.deFa(e.target.value), usErrs: { ...s.usErrs, price: '' } }),
-      usPhone: s.usPhone, onUsPhone: (e) => this.setState({ usPhone: e.target.value, usErrs: { ...s.usErrs, phone: '' } }),
+      usPhone: s.usPhone, onUsPhone: (e) => this.setState({ usPhone: this.deFa(e.target.value), usErrs: { ...s.usErrs, phone: '' } }),
       usDesc: s.usDesc, onUsDesc: (e) => this.setState({ usDesc: e.target.value.slice(0, 1000), usErrs: { ...s.usErrs, desc: '' } }),
       usDescCount: this.fmt(s.usDesc.length) + '/' + this.fmt(1000),
       usErrPhotos: s.usErrs.photos || '', usErrPrice: s.usErrs.price || '',
@@ -1286,13 +1374,17 @@ class Component extends DCLogic {
       submitUsed: this.submitUsed,
 
       // form success
-      fsTitle: s.fsKind === 'refill' ? 'درخواست شارژ ثبت شد' : 'پیشنهاد فروش ثبت شد',
+      fsTitle: s.fsKind === 'inquiry' ? 'درخواست استعلام قیمت ثبت شد' : s.fsKind === 'refill' ? 'درخواست شارژ ثبت شد' : 'پیشنهاد فروش ثبت شد',
       fsCode: s.fsCode,
       fsDelivery: s.requests[0] ? (s.requests[0].delivery || '') : '',
       fsHasDelivery: !!(s.fsKind === 'refill' && s.requests[0] && s.requests[0].delivery),
-      fsNote: s.fsKind === 'refill'
+      fsNote: s.fsKind === 'inquiry'
+        ? 'درخواست استعلام شما ثبت شد؛ کارشناسان قیمت روز را بررسی و در اسرع وقت با شما تماس می‌گیرند.'
+        : s.fsKind === 'refill'
         ? 'درخواست شما در صف بررسی اپراتور قرار گرفت؛ پس از تخصیص تکنسین، زمان مراجعه پیامک می‌شود.'
         : 'پیشنهاد شما در صف بررسی قرار گرفت؛ نتیجه (پذیرش، رد یا مذاکره) با پیامک اطلاع‌رسانی می‌شود.',
+      fsGoList: () => this.go({ route: s.fsKind === 'inquiry' ? 'inquiries' : 'requests' }),
+      fsListLabel: s.fsKind === 'inquiry' ? 'استعلام‌های من' : 'درخواست‌های من',
 
       // profile
       userName: s.userName || 'کاربر امداد اکسیژن',
@@ -1310,18 +1402,28 @@ class Component extends DCLogic {
       coSlots: this.SLOTS.map(sl => ({ key: sl[0], label: sl[1], style: this.slotChipStyle(s.coSlot === sl[0]), pick: () => this.setState({ coSlot: sl[0] }) })),
       successDelivery: s.orders[0] ? (s.orders[0].delivery || '') : '',
 
-      ordersList: s.orders.map(o => ({ no: o.no, date: o.date, countLabel: this.fmt(o.count), totalLabel: this.fmt(o.total), delivery: o.delivery || 'هماهنگی تلفنی', ...this.stepperVM('order', o.ts) })),
+      ordersList: s.orders.map(o => ({ no: o.no, date: o.date, countLabel: this.fmt(o.count), totalLabel: this.fmt(o.total), delivery: o.delivery || 'هماهنگی تلفنی', open: () => this.go({ route: 'orderDetail', odId: o.no, odFresh: false }), ...this.stepperVM('order', o.ts) })),
       ordersEmpty: s.orders.length === 0,
       requestsList: s.requests.map(r => ({
         kindLabel: r.kind === 'refill' ? 'شارژ کپسول گاز' : 'فروش دست دوم',
-        code: r.code, date: r.date, delivery: r.delivery || '', showDelivery: !!(r.kind === 'refill' && r.delivery), ...this.stepperVM(r.kind, r.ts)
+        code: r.code, date: r.date, delivery: r.delivery || '', showDelivery: !!(r.kind === 'refill' && r.delivery),
+        open: () => this.go({ route: 'requestDetail', rqCode: r.code }), ...this.stepperVM(r.kind, r.ts)
       })),
+      // Epic 3+5 / 4: detail view-models (od*/rd*) + route flags. Computed every render (cheap); the
+      // od*/rd* keys are only consumed by the orderDetail / requestDetail screens.
+      isOrderDetail: route === 'orderDetail', odFresh: !!s.odFresh, odNotFresh: !s.odFresh,
+      ...this.orderVM(s.orders.find(o => o.no === s.odId) || s.orders[0]),
+      isRequestDetail: route === 'requestDetail',
+      ...this.requestVM(s.requests.find(r => r.code === s.rqCode)),
       requestsEmpty: s.requests.length === 0,
+      inquiriesList: s.inquiries.map(iq => ({ title: iq.title, code: iq.code, date: iq.date, ...this.stepperVM('inquiry', iq.ts) })),
+      inquiriesEmpty: s.inquiries.length === 0,
       addrCards,
       wishItems: wishIds.map(id => this.vm(this.PRODUCTS.find(p => p.id === id))).filter(Boolean),
       wishEmpty: wishIds.length === 0,
 
       toastShow: s.toastShow, toastMsg: s.toastMsg,
+      fabStyle,
       navPillStyle,
       navs
     };

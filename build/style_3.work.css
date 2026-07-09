@@ -253,3 +253,17 @@ section[aria-label="چرا امداد اکسیژن"] > div:last-child > div:nth-
 
 /* ---- Cart stepper/trash press (pre-commit tactile feedback; no-JS + reduced-motion fallback) ---- */
 #cart-list button:active{ transform: scale(.9); transition: transform var(--dur-fast) var(--ease-spring); }
+
+/* ============================================================
+   DESIGN REFACTOR PASS (Head-of-Product review) — normalization layer
+   Reversible. Targets RAW inline literals only; token var() references are
+   already correct and fixed at their source constants. Spec + rationale:
+   docs/planning/design-refactor_execution-brief.md  (WI-01, WI-02)
+   ============================================================ */
+/* WI-02 — hierarchy by size, not weight: drop the ramp one notch, remove 800/900 */
+[style*="font-weight:900"]{ font-weight:700 !important; }   /* hero / page titles */
+[style*="font-weight:800"]{ font-weight:600 !important; }   /* emphasis / CTA labels */
+[style*="font-weight:700"]{ font-weight:500 !important; }   /* secondary labels, links, status pills */
+/* WI-01 — Persian readable floor: nothing user-read below 12px */
+[style*="font-size:9.5px"],[style*="font-size:10px"],[style*="font-size:10.5px"],
+[style*="font-size:11px"],[style*="font-size:11.5px"]{ font-size: 12px !important; }
