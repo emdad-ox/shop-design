@@ -1,0 +1,1 @@
+The 3 PNGs aren't referenced in the template. Let me check the resources directory for decoded files and confirm where the PNGs are referenced (likely inside Leaflet), then read the map-picker JS block.

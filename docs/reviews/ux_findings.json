@@ -1,0 +1,1775 @@
+[
+ {
+  "title": "No URL / History API — browser Back exits the app and nothing is deep-linkable",
+  "category": "navigation",
+  "changeType": "change-pages",
+  "severity": "high",
+  "evidence": "All navigation mutates a single in-memory string (script_2.js L4 `route:'home'`; every `go*` handler calls `setState({route:...})`, e.g. L472-485). No history.pushState, no hashchange, no popstate handler anywhere; markup_only.html has no anchors. componentDidUpdate (script L76-80) only scrolls.",
+  "userImpact": "In an installed/browser PWA a hardware or gesture Back leaves the app entirely instead of stepping back a screen; a reflexive back-swipe to dismiss the filter or address sheet also exits. No screen (product, order, request) can be bookmarked, shared, or reopened via URL, and analytics cannot attribute views to pages. This is the single biggest IA gap.",
+  "recommendation": "Introduce a thin router: push a history entry on each route/sheet change and map popstate back to `setState`. Give each route a URL (e.g. /products, /product/:id, /checkout) and treat open sheets as history states so Back closes them. This also unlocks deep-linking, share, and back-gesture support.",
+  "effort": "XL",
+  "affectedRoutes": [
+   "home",
+   "products",
+   "detail",
+   "cart",
+   "checkout",
+   "success",
+   "auth",
+   "services",
+   "refill",
+   "usedSale",
+   "formSuccess",
+   "profile",
+   "orders",
+   "requests",
+   "addresses",
+   "wishlist"
+  ]
+ },
+ {
+  "title": "Back targets are hardcoded per route, not caller-aware — Back lands on the wrong screen",
+  "category": "navigation",
+  "changeType": "change-pages",
+  "severity": "high",
+  "evidence": "Detail's back always calls `goProducts` (markup L170) regardless of origin, but detail is opened from home featured, wishlist, and related lists via the same `vm().open` (script L191). Refill/UsedSale back always call `goServices` (markup L391, L474) even though both are reachable from the home quick-action tiles (`goRefill`/`goUsed`, markup L67/L74; script L476-477).",
+  "userImpact": "home → tap featured product → Back drops you on the Products list you never visited; wishlist → product → Back leaves you in Products, not your wishlist; home → درخواست شارژ → Back dumps you in Services. Users lose their place and their mental model of 'up = where I came from' breaks.",
+  "recommendation": "Track a navigation origin (a small stack, or pass `from` into the open handler like auth already does with `authFrom`) and make the back chevron pop to the actual previous route. Minimum: have detail/refill/used remember and return to their entry route.",
+  "effort": "M",
+  "affectedRoutes": [
+   "detail",
+   "refill",
+   "usedSale",
+   "wishlist",
+   "home"
+  ]
+ },
+ {
+  "title": "Active bottom-tab is wrong during the auth flow (shows Profile mid-checkout)",
+  "category": "navigation",
+  "changeType": "both",
+  "severity": "high",
+  "evidence": "activeMap folds `auth:'profile'` (script L439). But guests are pushed into auth from the cart/checkout flow (`goCheckout` → `goAuthFor('checkout','cart')`, script L481-483) and from the refill/used forms (`goAuthFor('refill','refill','refill')` L262, `('usedSale','usedSale','used')` L276). The active-tab highlight therefore reads Profile while the back chevron simultaneously returns to Cart/Refill (`authBack` → `authFrom`, script L572).",
+  "userImpact": "During checkout login the user sees the Profile tab lit while the back arrow points to Cart — two contradictory 'where am I' signals. It misrepresents progress in a purchase funnel and erodes trust at the highest-intent moment.",
+  "recommendation": "Derive the active tab from `authFrom` (cart→Cart, refill/used→Services, profile→Profile), or better, hide the tab bar entirely on auth so no tab is falsely highlighted.",
+  "effort": "S",
+  "affectedRoutes": [
+   "auth",
+   "checkout",
+   "cart",
+   "refill",
+   "usedSale"
+  ]
+ },
+ {
+  "title": "Tab bar renders on every route, including immersive flows — invites accidental abandonment",
+  "category": "navigation",
+  "changeType": "change-pages",
+  "severity": "high",
+  "evidence": "The nav is a sibling of all route `<sc-if>` blocks and is always mounted (markup L911-925). It stays visible and tappable on auth/OTP (L315), checkout (L545), refill/used forms (L388/L471) and the success screens (L526/L600).",
+  "userImpact": "A user mid-OTP or mid-checkout can tap Home/Products and silently drop the flow with no confirmation; the persistent bar also competes for bottom space with each screen's fixed CTA (both `position:fixed` at bottom:0 and bottom:80px). On focused/task screens a tab bar is the wrong affordance and creates a second, conflicting exit next to the back chevron.",
+  "recommendation": "Hide the tab bar on 'pushed'/flow routes (detail, checkout, auth, refill, usedSale, success, formSuccess) and show it only on the five tab roots. If a flow must be interrupted, add an explicit confirm.",
+  "effort": "M",
+  "affectedRoutes": [
+   "auth",
+   "checkout",
+   "refill",
+   "usedSale",
+   "success",
+   "formSuccess",
+   "detail"
+  ]
+ },
+ {
+  "title": "Scroll always resets to top on route change — returning to a list loses your place",
+  "category": "navigation",
+  "changeType": "change-pages",
+  "severity": "medium",
+  "evidence": "componentDidUpdate unconditionally calls `window.scrollTo(0,0)` on any route change (script_2.js L78). Nothing stores or restores the outgoing route's scroll offset.",
+  "userImpact": "Browse-heavy commerce pattern is punished: scroll halfway down the (filtered) Products list, open a product, tap Back — the list jumps to the top and you must re-scroll to find where you were. Same for wishlist→detail→back. Filters persist (kept in state) but scroll position is thrown away.",
+  "recommendation": "Cache scrollTop per route on navigation-away and restore it when returning to a list route (products, wishlist, orders, requests); keep the scroll-to-top behavior only for forward/push navigations into detail/checkout.",
+  "effort": "M",
+  "affectedRoutes": [
+   "products",
+   "detail",
+   "wishlist",
+   "orders",
+   "requests"
+  ]
+ },
+ {
+  "title": "Tabs don't remember their sub-screen — every tab tap resets to the tab root",
+  "category": "navigation",
+  "changeType": "change-pages",
+  "severity": "medium",
+  "evidence": "navDefs handlers hard-set the root route (`route:'services'` etc., script L429-433). There is no per-tab route memory, so tapping the Services tab always shows the Services landing, never a refill/used form you were in.",
+  "userImpact": "Half-filling the refill form, tapping another tab, then tapping Services again shows the landing card list instead of resuming your form (the field data survives in state, but you're dropped at the root and must re-navigate in). This violates the standard mobile expectation that each tab preserves its own stack.",
+  "recommendation": "Store the current sub-route per tab and restore it on tab re-selection (tap an already-active tab pops to that tab's root; tapping an inactive tab restores its last screen).",
+  "effort": "M",
+  "affectedRoutes": [
+   "services",
+   "refill",
+   "usedSale",
+   "profile",
+   "orders",
+   "requests"
+  ]
+ },
+ {
+  "title": "Inconsistent modality: login is a full route while address/filter are bottom sheets",
+  "category": "navigation",
+  "changeType": "change-pages",
+  "severity": "medium",
+  "evidence": "Auth is a top-level route (`isAuth`, markup L315) that replaces the screen, whereas add/edit-address and filter/sort are overlay sheets with scrims (`addrSheetOpen` L864, `sheet` L840). Because the nav always mounts (L911), the 'modal' login still shows the tab bar underneath and can be escaped by a tab tap, while the sheets cannot.",
+  "userImpact": "Two different mental models for interruptions. Login looks like a page (has a back chevron and visible tabs) yet behaves like a required modal; sheets look modal (scrim) yet can't be dismissed by Back. The mismatch makes it unclear whether an action is a detour or a destination.",
+  "recommendation": "Pick one modality per interaction class: make auth a true modal/overlay (scrim, chrome hidden, dismiss = cancel) consistent with the sheets, or make address/filter full routes. Keep entry/exit affordances uniform.",
+  "effort": "M",
+  "affectedRoutes": [
+   "auth",
+   "addresses",
+   "checkout",
+   "refill",
+   "products"
+  ]
+ },
+ {
+  "title": "Terminal success screens carry redundant and stale navigation",
+  "category": "navigation",
+  "changeType": "change-pages",
+  "severity": "medium",
+  "evidence": "success (markup L600-617) and formSuccess (L526-543) have no back chevron and offer two action buttons, yet the ever-present tab bar also shows — with a stale highlight: activeMap maps `success:'cart'` and `formSuccess:'services'` (script L437-438) even though the cart was just emptied by placeOrder (script L315).",
+  "userImpact": "On the order-confirmation screen the Cart tab is highlighted; tapping it lands the user on an empty cart, which reads like the order vanished. Duplicate exits (two buttons + five tabs) add decision friction at the confirmation moment.",
+  "recommendation": "On terminal screens, hide the tab bar (or don't highlight any tab) and let the explicit CTAs own navigation; if the tab bar stays, highlight a neutral/home tab rather than the now-empty Cart.",
+  "effort": "S",
+  "affectedRoutes": [
+   "success",
+   "formSuccess",
+   "cart"
+  ]
+ },
+ {
+  "title": "Orders / requests / wishlist / addresses are buried one level under Profile with one-way back",
+  "category": "navigation",
+  "changeType": "change-pages",
+  "severity": "medium",
+  "evidence": "These four destinations exist only as menu rows in Profile (menuRows, script L453-458; markup L654-665) and each returns solely to Profile (`goProfile`, markup L688/L720/L752/L804). There is no direct tab, header shortcut, or cross-link (e.g. success→orders exists, but orders' Back still goes to Profile, not back to success).",
+  "userImpact": "High-frequency account tasks (track an order, revisit wishlist) always cost Profile → row → page, and every exit forces you back through Profile even when you arrived from elsewhere. Wishlist in particular has no persistent entry point despite being a core commerce feature.",
+  "recommendation": "Surface the most-used sections directly: a wishlist/heart affordance in the product and home chrome, an Orders shortcut, and count badges on the Profile tab. Make these pages' Back caller-aware (see the back-target finding).",
+  "effort": "M",
+  "affectedRoutes": [
+   "profile",
+   "orders",
+   "requests",
+   "wishlist",
+   "addresses"
+  ]
+ },
+ {
+  "title": "No route/state restoration — relaunch always dumps the user on Home and loses in-progress flows",
+  "category": "state",
+  "changeType": "change-state",
+  "severity": "medium",
+  "evidence": "State is fully in-memory with `route:'home'` as the default (script_2.js L3-28); there is no localStorage/sessionStorage read on mount (componentDidMount L67-75 only sets theme/dir and optional auto-login) and no route persistence.",
+  "userImpact": "For an app presented as an installable PWA, closing and reopening (or an accidental reload) always returns to Home and discards the current route, the cart, a half-filled checkout, and any in-progress refill/used form. Continuity — the core promise of an installed app — is absent.",
+  "recommendation": "Persist at least `route` + `cart` + auth + in-progress form drafts (localStorage) and rehydrate on mount so the app resumes where the user left off; pair with the URL routing work so a reload restores the same screen.",
+  "effort": "L",
+  "affectedRoutes": [
+   "home",
+   "cart",
+   "checkout",
+   "refill",
+   "usedSale"
+  ]
+ },
+ {
+  "title": "Address sheet's form mode is a mini dead-end with no step-back",
+  "category": "navigation",
+  "changeType": "change-state",
+  "severity": "low",
+  "evidence": "From the address picker (pick mode, markup L870) tapping 'افزودن آدرس جدید' switches the same sheet to form mode (L884). Form mode's only exits are Save (`saveAddr` sets `addrSheet:null`, script L296/L300) or the scrim/close (`closeAddrSheet` → `addrSheet:null`, script L552) — both dismiss the entire sheet; there is no 'back to address list' within the sheet, and (no history) a back-swipe exits the app.",
+  "userImpact": "A user who opened the picker to switch addresses, then tapped 'add new', cannot return to the selection list without abandoning the whole sheet and reopening it. Minor but a real micro dead-end in the checkout/refill address change flow.",
+  "recommendation": "Add a back control in the sheet header that returns form→pick mode (set `addrSheet:'pick'`) instead of only a full close, mirroring a normal push/pop inside the overlay.",
+  "effort": "S",
+  "affectedRoutes": [
+   "checkout",
+   "refill",
+   "addresses"
+  ]
+ },
+ {
+  "title": "Branded header and theme toggle live only on Home — inconsistent global chrome / poor settings discoverability",
+  "category": "navigation",
+  "changeType": "other",
+  "severity": "low",
+  "evidence": "The logo+title+theme-toggle header exists only in the home route (markup L35-51). The other four tab roots (products L112, services L359, cart L253, guest profile L621) have a plain `<h1>` and no toggle; the theme switch otherwise hides deep in the Profile menu (L666-672).",
+  "userImpact": "Global identity and the theme control appear/disappear depending on tab, so the app's chrome feels unstable across the five roots, and a guest (who has no Profile menu) can only change theme by returning to Home. Settings-type controls are hard to find.",
+  "recommendation": "Standardize a lightweight header across the tab roots (consistent title treatment, and a persistent, discoverable theme/settings affordance) so global chrome and controls don't move around per screen.",
+  "effort": "S",
+  "affectedRoutes": [
+   "home",
+   "products",
+   "services",
+   "cart",
+   "profile"
+  ]
+ },
+ {
+  "title": "Price-inquiry (استعلام) flow captures no lead — a dead-end toast that breaks a promise",
+  "category": "forms",
+  "changeType": "both",
+  "severity": "critical",
+  "evidence": "script_2.js L193 `inquire` fires toast 'درخواست استعلام ثبت شد؛ کارشناسان با شما تماس می‌گیرند' and does nothing else — no phone/name/product captured, no record created, no route change. Wired to the two highest-value, price-hidden items (conc/اکسیژن‌ساز and co2/کپسول CO₂, price:0 vis:false at script L40,L49) via detail L206 and products L144.",
+  "userImpact": "The app literally promises 'our experts will call you' while capturing zero contact info, so the business cannot follow up — the lead evaporates on the single most lucrative merchandise (a concentrator is the priciest SKU). The app already knows how to capture leads: the refill/used flows preserve a guest submission through OTP (pendingSubmit script L262 → completed at L229) and create a `requests` record — inquiry is the one path that drops it.",
+  "recommendation": "Reuse the existing requests[]/code()/formSuccess machinery (script L236-252) with kind:'inquiry': open a small sheet or route prefilling phone (and note), create a request record, and land on formSuccess with a tracking code. Cheap because the plumbing exists; also surface the 24/7 line as an instant alternative.",
+  "effort": "S",
+  "affectedRoutes": [
+   "detail",
+   "products",
+   "home",
+   "requests",
+   "formSuccess"
+  ]
+ },
+ {
+  "title": "No trust, certification, license, warranty or return signals anywhere — critical for medical-oxygen commerce",
+  "category": "trust-content",
+  "changeType": "other",
+  "severity": "critical",
+  "evidence": "Entire markup_only.html has no trust row: no eNamad (نماد اعتماد الکترونیکی), no IMED/medical-device registration (اداره کل تجهیزات پزشکی), no business license, no return/warranty/refund policy, no hydrostatic-test disclosure in the commerce flow (only buried in one product's prose desc, script L32 oxy40). Home hero (L53-64) and product detail (L209-221) sell hard but show zero credibility markers. Success/formSuccess (L611, L537) promise SMS/callback that no system backs.",
+  "userImpact": "Iranian buyers gate trust on eNamad/IMED for medical purchases; their absence, plus no warranty/return terms, kills conversion for a high-consideration, safety-critical product and exposes the shop to disputes. The recurring 'پیامک ارسال شد' promises (success L606, formSuccess L532) with no SMS reinforce an untrustworthy impression.",
+  "recommendation": "Add a trust strip (eNamad/IMED badges, business license no., authorized-dealer note) on home, detail, and checkout; add a short return/warranty/hydro-test-validity policy accessible from detail and profile; only claim SMS once real notifications exist.",
+  "effort": "L",
+  "affectedRoutes": [
+   "home",
+   "detail",
+   "checkout",
+   "success",
+   "profile"
+  ]
+ },
+ {
+  "title": "No safety-handling or prescription/eligibility guidance for pressurized medical oxygen",
+  "category": "trust-content",
+  "changeType": "other",
+  "severity": "high",
+  "evidence": "Detail specs/desc (markup L209-221) show only dry specs; cylinders are 150-bar pressurized (script L33 specs) and oxygen is an oxidizer, yet there is no handling/storage/transport warning, no flow-rate/usage guidance, and no prescription or medical-eligibility notice. addToCart (script L163-169) lets anyone add a 40L medical cylinder and reach checkout with no gating.",
+  "userImpact": "Selling life-support medical oxygen with no safety or eligibility content is a liability and erodes expert credibility; buyers unsure how to size/handle a cylinder are more likely to abandon or misuse the product (fire/injury risk).",
+  "recommendation": "Add a collapsible 'ایمنی و نگهداری' block on cylinder/device detail pages (keep away from oil/flame, secure upright, transport rules), a flow-rate/usage helper, and a medical-oxygen eligibility/consult note; consider a checkbox acknowledgment at checkout for medical cylinders.",
+  "effort": "M",
+  "affectedRoutes": [
+   "detail",
+   "checkout",
+   "refill"
+  ]
+ },
+ {
+  "title": "Guest checkout gate plus zero cart/session persistence causes abandonment on the primary path",
+  "category": "state",
+  "changeType": "both",
+  "severity": "high",
+  "evidence": "goCheckout redirects guests to the OTP screen (script L481-484); the app boots guest per ground-truth, and nothing persists — state is fully in-memory (script L3-28), so a reload or any interruption loses cart, auth, orders and requests. The OTP round-trip (script L210-233) is the only gate before an order can be placed.",
+  "userImpact": "A guest who fills a cart for an urgent medical order is bounced to an SMS round-trip and loses the entire cart on any reload/interruption — a costly drop exactly at the highest-intent moment, and worse for time-critical oxygen needs.",
+  "recommendation": "Persist cart (and lightweight session) to localStorage; allow a guest 'order with phone' path that defers OTP to the final confirm while preserving the cart, or at minimum keep the cart intact through the auth detour and show a resume banner.",
+  "effort": "M",
+  "affectedRoutes": [
+   "cart",
+   "checkout",
+   "auth"
+  ]
+ },
+ {
+  "title": "No delivery date/time slot and shipping cost is excluded from the 'final' total",
+  "category": "state",
+  "changeType": "change-state",
+  "severity": "high",
+  "evidence": "Checkout offers only a single non-interactive 'هماهنگی تلفنی' radio (markup L570-577) — no date/time or express option. Shipping shows 'هماهنگی تلفنی' as a text value in cart (L296) and is omitted from checkout summary, so 'مبلغ قابل پرداخت'/'مبلغ نهایی' (L298, L589) is not actually the amount payable.",
+  "userImpact": "For an often-urgent oxygen purchase, customers get no ETA and no way to request fast delivery, and they commit to an order whose true cost (delivery) is unknown — both suppress conversion and invite post-order friction.",
+  "recommendation": "Add a delivery-timing selector (e.g. standard vs 'فوری/امروز') and compute or estimate a shipping cost line that feeds the total; if truly phone-arranged, state a promised call-back window and a delivery-fee range so the total reads as final.",
+  "effort": "M",
+  "affectedRoutes": [
+   "checkout",
+   "cart"
+  ]
+ },
+ {
+  "title": "24/7 urgent oxygen line is plain text (not tel:) and buried on the Services tab",
+  "category": "interaction",
+  "changeType": "other",
+  "severity": "high",
+  "evidence": "The emergency number appears once, at the bottom of Services, as static bold text '<b>0912 845 7455</b>' (markup L383) with no `tel:` anchor anywhere in the markup. It is absent from home, cart, checkout, detail, and out-of-stock/inquiry contexts.",
+  "userImpact": "In a medical emergency the fastest conversion path is a phone call, but users cannot tap to dial and have to hunt to find the number — a large miss for a shop whose differentiator is شبانه‌روزی urgent supply.",
+  "recommendation": "Make it a `tel:` link and surface a persistent 'تماس فوری' affordance on home, cart, checkout, and on out-of-stock/inquiry detail states so the urgent line is always one tap away.",
+  "effort": "S",
+  "affectedRoutes": [
+   "services",
+   "home",
+   "cart",
+   "checkout",
+   "detail"
+  ]
+ },
+ {
+  "title": "Order and request status is frozen at 'ثبت‌شده' — no tracking lifecycle or per-order actions",
+  "category": "state",
+  "changeType": "change-state",
+  "severity": "high",
+  "evidence": "placeOrder hardcodes status:'ثبت‌شده' (script L316) and it never changes; the orders route renders a single static chip (markup L700-713) with no timeline, ETA, or actions. Requests get a fixed 'ثبت‌شده'/'در انتظار بررسی' (script L240,L248) that likewise never progresses (requests route L732-745).",
+  "userImpact": "Post-purchase anxiety is high for a medical product; with no confirmed→dispatched→delivered visibility, no ETA, and no way to contact support about a specific order, customers churn to phone calls and lose confidence in reordering.",
+  "recommendation": "Model a status lifecycle with a visible timeline on order/request detail, an ETA, and per-order actions (call support, reorder); even mocked progression communicates a real fulfillment process.",
+  "effort": "M",
+  "affectedRoutes": [
+   "orders",
+   "requests",
+   "success",
+   "formSuccess"
+  ]
+ },
+ {
+  "title": "No re-order or refill reminders — misses the recurring-oxygen retention goldmine",
+  "category": "state",
+  "changeType": "both",
+  "severity": "high",
+  "evidence": "Order history rows (markup L700-713) offer no 'سفارش مجدد' action, and there is no reminder/subscription mechanism anywhere (state model script L3-28 has no scheduling). Oxygen refills are inherently periodic (a patient consumes cylinders on a cadence).",
+  "userImpact": "The most predictable, highest-LTV behavior in this business — recurring cylinder refills — is left entirely to the customer's memory, forfeiting easy repeat revenue and the loyalty that comes from proactively supporting a patient's supply.",
+  "recommendation": "Add one-tap reorder from order/request history that repopulates the cart, and an opt-in refill reminder ('X روز از آخرین شارژ') or light subscription; surface a 'شارژ مجدد' shortcut on the order-detail and requests screens.",
+  "effort": "M",
+  "affectedRoutes": [
+   "orders",
+   "requests",
+   "cart",
+   "profile"
+  ]
+ },
+ {
+  "title": "Out-of-stock item is a hard dead-end — no notify-me, alternative, or inquiry fallback",
+  "category": "forms",
+  "changeType": "change-state",
+  "severity": "high",
+  "evidence": "nebu has stock:0 (script L52); detail shows a disabled 'ناموجود' CTA (markup L241-247) and products shows a ناموجود badge (L137-139) with no capture path — no 'notify when available', no suggested alternative, no route to the 24/7 line.",
+  "userImpact": "Demonstrated demand (a user viewing an out-of-stock respiratory device) is thrown away with no way to recover the customer or capture a lead — a pure lost-sale and lost-contact.",
+  "recommendation": "Replace the dead disabled button with an 'اطلاع‌رسانی هنگام موجود شدن' capture (phone) that creates a lead record, plus a suggested in-stock alternative and a tap-to-call fallback.",
+  "effort": "S",
+  "affectedRoutes": [
+   "detail",
+   "products"
+  ]
+ },
+ {
+  "title": "No online payment step — checkout ends before money changes hands (build-out opportunity)",
+  "category": "state",
+  "changeType": "change-pages",
+  "severity": "high",
+  "evidence": "placeOrder (script L308-318) jumps straight from 'ثبت نهایی سفارش' (markup L594) to success, which states payment is arranged by phone ('جهت هماهنگی پرداخت ... تماس می‌گیرند', L611). There is no payment-method choice, no gateway (درگاه/Shaparak), and no COD selection.",
+  "userImpact": "Phone-arranged payment adds friction and lowers trust versus a gateway that escrows funds; for many Iranian buyers online payment is table stakes, and its absence caps conversion and average order confidence.",
+  "recommendation": "Add a payment step offering online gateway and/or COD with clear method selection before confirmation; if phone-coordination remains the model short-term, present it as an explicit chosen option rather than the only outcome.",
+  "effort": "L",
+  "affectedRoutes": [
+   "checkout",
+   "success"
+  ]
+ },
+ {
+  "title": "Thin, hardcoded merchandising: static 'featured', weak 'related', and no cross-sell bundles",
+  "category": "trust-content",
+  "changeType": "other",
+  "severity": "medium",
+  "evidence": "featured is a fixed id list ['oxy40','oxy5','conc'] (script L489) that even includes an inquiry-only item (conc) with no price; related is naïvely 'same category, first 2' (script L505), so a 40L cylinder recommends other cylinders, never its manometer/mask accessories. No bundles or 'frequently bought together' exist.",
+  "userImpact": "High-value medical purchases naturally pair (cylinder + regulator/manometer + mask), but the app never cross-sells or upsells, leaving basket-size and attach-rate revenue on the table and making 'featured' feel arbitrary.",
+  "recommendation": "Drive featured by stock/popularity/margin and exclude price-hidden items or badge them; make 'related' an accessory/compatibility map (cylinder→manometer/mask), and add a 'خرید مجموعه' bundle card on detail and in cart.",
+  "effort": "M",
+  "affectedRoutes": [
+   "home",
+   "detail",
+   "cart",
+   "products"
+  ]
+ },
+ {
+  "title": "Weak discoverability: no medical-vs-industrial or gas-type facets, and search isn't live",
+  "category": "state",
+  "changeType": "change-state",
+  "severity": "medium",
+  "evidence": "Filtering is only category + in-stock + 3 sorts (script L327-337); gas type exists as data (p.gas) and as a refill-form chip but is not a product facet. Search is a substring match over title+desc+gas (script L330-333) bound to onchange, not oninput (markup L116), so results don't update as the user types. The shop explicitly serves both طبی and صنعتی but offers no way to segment them.",
+  "userImpact": "A hospital buyer and an industrial welder have opposite needs yet see one undifferentiated list; the non-live search and missing gas/usage facets make relevant products harder to find, depressing product-page reach and conversion.",
+  "recommendation": "Add a medical/industrial (طبی/صنعتی) segment toggle and gas-type facets in the filter sheet, and switch search to live oninput filtering.",
+  "effort": "M",
+  "affectedRoutes": [
+   "products"
+  ]
+ },
+ {
+  "title": "No social proof — no ratings, reviews, or delivered-volume signals",
+  "category": "trust-content",
+  "changeType": "other",
+  "severity": "medium",
+  "evidence": "No product ratings, customer reviews, testimonials, or aggregate stats appear anywhere in markup_only.html (product detail L167-249 has specs/desc only).",
+  "userImpact": "For a high-trust medical purchase, social proof is one of the strongest conversion levers; its complete absence leaves first-time buyers with nothing but the shop's own claims to go on.",
+  "recommendation": "Add star ratings/review snippets on detail and simple credibility stats (e.g. 'X شارژ موفق', years in service, service-area coverage) on home and detail.",
+  "effort": "M",
+  "affectedRoutes": [
+   "detail",
+   "home"
+  ]
+ },
+ {
+  "title": "Empty states are thin and skip conversion nudges",
+  "category": "trust-content",
+  "changeType": "other",
+  "severity": "low",
+  "evidence": "Only the empty-cart state has an illustrative icon (markup L256-258); the orders (L693-699), requests (L725-731), and wishlist (L809-815) empties are text-only and visually thinner. None cross-sell featured items or surface the 24/7 urgent line.",
+  "userImpact": "Empty screens are missed opportunities to re-engage: a shopper with an empty cart or no orders is nudged nowhere beyond a generic 'browse products' button, and never toward featured items or the urgent-supply line.",
+  "recommendation": "Give orders/requests/wishlist empties a consistent icon treatment, and enrich the empty-cart (and empty-orders) states with a couple of featured/most-refilled items and a tap-to-call urgent-line prompt.",
+  "effort": "S",
+  "affectedRoutes": [
+   "cart",
+   "orders",
+   "requests",
+   "wishlist"
+  ]
+ },
+ {
+  "title": "Product cards and custom controls are non-focusable div/span onclick — keyboard users cannot open a product or operate toggles/radios",
+  "category": "accessibility",
+  "changeType": "both",
+  "severity": "critical",
+  "evidence": "markup_only.html L89 (home featured card <div onclick=item.open>), L132 (products list card), L225 (related products), L818 (wishlist card) — the ONLY way to reach a product detail page; plus radio/switch controls built as divs/spans: delivery radios L424, sort radios L849, address-pick radios L873, stock switch L855/L857, and the profile dark-mode toggle which is a bare <span onclick={{toggleTheme}}> L671. Handlers are wired in script_2.js (open L191, toggleTheme L671-vm). None have tabindex, role, or keyboard handlers, and style_3.css defines no :focus styles at all.",
+  "userImpact": "A keyboard-only or switch-access user literally cannot navigate from the catalog to any product detail page (the card div is unreachable), cannot switch theme from profile, and cannot choose a delivery method, sort order, or saved address. The core browse→detail→buy funnel is blocked and screen readers announce these controls as plain text with no role or state.",
+  "recommendation": "Render every clickable element as a native <button>/<a> (or add role plus tabindex=0 and Enter/Space key handlers in the runtime). Implement radios as role=radiogroup/radio with arrow-key roving tabindex, and the theme/stock switches as <button role=switch aria-checked>. Add a global :focus-visible outline in style_3.css so focus is always visible. WCAG 2.1.1 Keyboard (A), 2.4.7 Focus Visible (AA), 4.1.2 Name/Role/Value (A).",
+  "effort": "L",
+  "affectedRoutes": [
+   "home",
+   "products",
+   "detail",
+   "wishlist",
+   "refill",
+   "profile",
+   "checkout"
+  ]
+ },
+ {
+  "title": "No focus management on route or auth-step change — focus is stranded, SR users never learn a new page loaded",
+  "category": "navigation",
+  "changeType": "change-pages",
+  "severity": "critical",
+  "evidence": "script_2.js componentDidUpdate L76-80 does only window.scrollTo(0,0) on route change — no focus move and no live-region announcement. Content swaps happen via <sc-if> branches (markup), so the trigger button unmounts and focus falls back to <body>. The phone→OTP transition (sendOtp L210-215 sets authStep='code') never moves focus to the OTP field L341.",
+  "userImpact": "After tapping a nav item, a back chevron, or 'دریافت کد تأیید', keyboard focus resets to the top of the document and screen-reader users get no notification that the page/step changed — they must blindly re-explore from the top every navigation. In a 17-route SPA this makes the whole app disorienting and slow for AT users.",
+  "recommendation": "On route change, move focus to the new page's <h1> (make it tabindex=-1) and/or expose an aria-live=polite region that announces the page title. On phone→OTP, focus the OTP input. Restore focus to the invoking control when closing overlays. WCAG 2.4.3 Focus Order (A); SPA route-change focus best practice.",
+  "effort": "M",
+  "affectedRoutes": [
+   "home",
+   "products",
+   "detail",
+   "cart",
+   "checkout",
+   "auth",
+   "services",
+   "refill",
+   "usedSale",
+   "profile",
+   "orders",
+   "requests",
+   "addresses",
+   "wishlist"
+  ]
+ },
+ {
+  "title": "Toasts are the only feedback for major actions but are never announced to screen readers",
+  "category": "accessibility",
+  "changeType": "change-state",
+  "severity": "high",
+  "evidence": "markup_only.html L905-909 renders the toast as a plain <div> with no role=status/alert or aria-live; it mounts/unmounts via <sc-if value=toastShow>. script_2.js toast() L157-161 is the sole confirmation for add-to-cart (addToCart L168), login success ('با موفقیت وارد شدید' L228), OTP sent (L214), discount applied (L530), and every form-validation failure ('لطفاً موارد مشخص‌شده را تکمیل کنید' L261/L275).",
+  "userImpact": "A blind user adds an item to the cart, applies a discount, logs in, or submits an invalid form and receives no perceivable feedback at all — the visual toast flashes for 2.4s and is gone. They cannot tell whether the action succeeded or failed, breaking every state-changing flow in the app.",
+  "recommendation": "Give the toast container a persistent role=status aria-live=polite (rendered always-present, text swapped in) and use role=alert for error toasts. Because <sc-if> remounts the node, keep a permanent live region in the DOM and only change its text. WCAG 4.1.3 Status Messages (AA).",
+  "effort": "S",
+  "affectedRoutes": [
+   "products",
+   "detail",
+   "cart",
+   "auth",
+   "refill",
+   "usedSale",
+   "addresses"
+  ]
+ },
+ {
+  "title": "Bottom sheets and menus are not dialogs — no role, no focus trap/move/restore, no Escape, keyboard-dead scrim",
+  "category": "accessibility",
+  "changeType": "change-state",
+  "severity": "high",
+  "evidence": "Filter/sort sheet markup L840-862 and address sheet L864-903 are bare <div>s with no role=dialog / aria-modal / aria-labelledby; their scrims are non-focusable <div onclick={{closeSheet}}> L841/L865; the address kebab menu L770-791 opens with a <div onclick={{ad.closeMenu}}> backdrop L774. Nothing moves focus into the sheet, traps it, restores it on close, or closes on Escape; background content is not inert.",
+  "userImpact": "When a sheet opens, a keyboard/SR user's focus stays on the trigger behind the scrim; they can tab into the obscured page underneath, have no way to reach or dismiss the sheet (the scrim isn't keyboard-operable and Escape does nothing), and are never told a dialog appeared. The filter, address-picker, and address-menu flows are unusable without a pointer.",
+  "recommendation": "Make each sheet role=dialog aria-modal=true with aria-labelledby the sheet title; on open move focus to the first control and trap Tab within; on close restore focus to the trigger; support Escape; mark background inert/aria-hidden. Give the kebab a role=menu with arrow-key navigation. WCAG 2.4.3 (A), 4.1.2 (A), ARIA APG dialog pattern.",
+  "effort": "M",
+  "affectedRoutes": [
+   "products",
+   "checkout",
+   "refill",
+   "addresses"
+  ]
+ },
+ {
+  "title": "Inputs rely on placeholders and unassociated labels; OTP and checkout phone have NO accessible name",
+  "category": "forms",
+  "changeType": "other",
+  "severity": "high",
+  "evidence": "OTP input markup L341 has only placeholder '______' (no label/aria-label). Checkout phone L568 has no label, no placeholder, and no aria-label at all. Search L116, discount L285, refill phone L453 / notes L457, used price L498 / phone L504 / desc L511, and profile name L646 use placeholder-as-label only. The auth-phone <label> L329 and address-form <label>s L885/L887 are not tied to their inputs via for/id.",
+  "userImpact": "Screen readers announce the OTP and checkout-phone fields as an unlabeled 'edit text', so a blind user cannot tell what to type at the two most critical points of the purchase flow. For placeholder-only fields the label vanishes as soon as typing starts, and users with cognitive/low-vision needs lose the prompt. WCAG 1.3.1 (A), 3.3.2 Labels or Instructions (A), 4.1.2 (A), 1.4.13.",
+  "recommendation": "Give every input a programmatic label — associate the existing visible label rows via for/id, wrap inputs in <label>, or add aria-label where no visible label exists (OTP='کد تأیید', checkout phone='شماره تماس'). Never use placeholder as the sole label.",
+  "effort": "M",
+  "affectedRoutes": [
+   "auth",
+   "checkout",
+   "products",
+   "cart",
+   "refill",
+   "usedSale",
+   "profile",
+   "addresses"
+  ]
+ },
+ {
+  "title": "Selected/active states exposed by color only; nav tabs lack aria-current, chips lack aria-pressed, two icon buttons have no name",
+  "category": "accessibility",
+  "changeType": "change-state",
+  "severity": "high",
+  "evidence": "Bottom-nav active tab is styled color-only (script_2.js L442-447) with no aria-current. Category chips (markup L124 / script L350-356) and gas chips (L416) show selection only via background color, no aria-pressed. The wishlist toggle aria-label is the static 'علاقه‌مندی' L174 and never reflects on/off (script L516-517). The home theme-toggle button L43 and the products filter/sort button L118 are icon-only with NO aria-label. Switches L671/L857 are spans without role=switch/aria-checked.",
+  "userImpact": "Screen-reader users cannot perceive which tab, category, or sort is currently active, whether an item is already wishlisted, or what the two unlabeled icon buttons do ('button' is all they hear). Colorblind and low-vision users also can't rely on the color-only active state. WCAG 1.4.1 Use of Color (A), 4.1.2 (A).",
+  "recommendation": "Add aria-current=page to the active nav tab, aria-pressed to filter/sort chips, a dynamic aria-label plus aria-pressed to the wishlist button, aria-label to the theme and filter buttons, and role=switch aria-checked to the toggles. Pair the color state with a non-color cue (underline/checkmark/bold already partly present).",
+  "effort": "M",
+  "affectedRoutes": [
+   "home",
+   "products",
+   "detail",
+   "profile"
+  ]
+ },
+ {
+  "title": "Validation errors are unannounced, color-only, and not tied to their fields; focus is not moved to the first error",
+  "category": "forms",
+  "changeType": "change-state",
+  "severity": "high",
+  "evidence": "Error text renders in <div style=color:var(--err)> with no role=alert, no aria-live, no aria-describedby link, and the inputs get no aria-invalid: refill errors L411/L419/L430/L449/L454, used-sale L494/L501/L505/L512, auth L331/L342, address L898. submitRefill (script L253-264) and submitUsed (L265-278) set these on submit and fire a toast (also silent) without moving focus to the offending field.",
+  "userImpact": "A screen-reader or keyboard user who submits the refill, used-sale, checkout, address, or auth form with an error hears nothing, sees only a red string they may not perceive (colorblind), and has no programmatic path to the failing field — they are stuck at submit with no idea what to fix. WCAG 3.3.1 Error Identification (A), 1.4.1 (A), 3.3.3 Error Suggestion (AA), 4.1.3 (AA).",
+  "recommendation": "On submit set aria-invalid=true on failing inputs, link each error via aria-describedby, render the error text with role=alert (or move focus to the first invalid field), and prefix errors with a non-color icon/word so the message isn't color-dependent.",
+  "effort": "M",
+  "affectedRoutes": [
+   "refill",
+   "usedSale",
+   "checkout",
+   "auth",
+   "addresses"
+  ]
+ },
+ {
+  "title": "White-on-teal primary CTA fails contrast (4.27:1 light / 3.49:1 dark); muted text and placeholders are borderline-to-failing",
+  "category": "visual",
+  "changeType": "other",
+  "severity": "high",
+  "evidence": "Primary buttons use background:var(--p) with color:#fff at 14.5px/800 (e.g. markup L308 cart CTA, L332 send-OTP, L594 place-order, L465 uses --acc). Measured: #fff on --p = 4.27:1 (light #0b8a78) and 3.49:1 (dark #0e9a8b) — below the 4.5:1 needed for this non-large text. --tx2 muted 11-12px text ≈4.98:1 on glass but drops over the animated aurora; ::placeholder{opacity:.8} (style_3.css) drives placeholder text (the de-facto label) to ~2.7:1; the guest warn banner (markup L301) warn-on-warn-soft ≈3.03:1.",
+  "userImpact": "The main call-to-action on every screen, plus the pervasive small secondary text and the placeholder text that doubles as the only field label, are hard or impossible to read for low-vision users — and worse where semi-transparent glass floats over the moving colored blobs. WCAG 1.4.3 Contrast (AA), 1.4.11 Non-text Contrast (AA).",
+  "recommendation": "Darken --p for on-white text (or use a darker ink on lighter fills) to reach ≥4.5:1; raise --tx2 luminance and remove the 0.8 placeholder opacity; ensure a solid/opaque backing behind text that overlays the aurora so measured contrast holds. Re-audit all fills with a contrast checker in both themes.",
+  "effort": "M",
+  "affectedRoutes": [
+   "home",
+   "products",
+   "detail",
+   "cart",
+   "checkout",
+   "auth",
+   "refill",
+   "usedSale",
+   "profile"
+  ]
+ },
+ {
+  "title": "No landmarks and inconsistent headings — 8 routes expose their title as a non-heading div",
+  "category": "accessibility",
+  "changeType": "other",
+  "severity": "medium",
+  "evidence": "There are no <nav>/<main>/<header> landmarks anywhere; the bottom nav is a plain <div> (markup L911). Auth L321, refill L394, used-sale L477, checkout L551, orders L691, requests L723, addresses L755, and wishlist L807 render their visible page title as a styled <div>, not an <h1>/<h2>, so those routes have no heading (detail's <h1> is the product title, not the 'جزئیات محصول' header row L173).",
+  "userImpact": "Screen-reader users who navigate by landmarks or headings — a primary AT strategy — find no regions to jump to and no heading on nearly half the routes, so they cannot quickly orient or skip the repeated nav. WCAG 1.3.1 Info and Relationships (A), 2.4.1 Bypass Blocks (A), 2.4.6 Headings and Labels (AA).",
+  "recommendation": "Wrap the scrolling content in <main>, the bottom bar in <nav aria-label='ناوبری اصلی'>, and the home top bar in <header>. Promote each page's title row to a real <h1>. Optionally add a skip-to-content link.",
+  "effort": "M",
+  "affectedRoutes": [
+   "auth",
+   "refill",
+   "usedSale",
+   "checkout",
+   "orders",
+   "requests",
+   "addresses",
+   "wishlist"
+  ]
+ },
+ {
+  "title": "prefers-reduced-motion only pauses the aurora; an infinite pulsing dot and all sheet/toast/fade animations keep moving",
+  "category": "accessibility",
+  "changeType": "other",
+  "severity": "medium",
+  "evidence": "style_3.css L62: @media (prefers-reduced-motion:reduce){body::before,body::after{animation:none}} — only the two aurora blobs. The hero badge dot runs animation:breathe 3s ease-in-out infinite (markup L59) continuously, and sheetIn/toastIn/fadeIn/floaty keyframes remain active for users who asked to reduce motion.",
+  "userImpact": "Users with vestibular disorders or motion sensitivity who enable reduced motion still get a perpetually pulsing indicator and sliding/fading UI, which can trigger discomfort or nausea. The infinite pulse in particular is continuous motion with no pause control. WCAG 2.2.2 Pause, Stop, Hide (A) for the infinite animation; 2.3.3 Animation from Interactions (AAA).",
+  "recommendation": "Extend the reduced-motion query to disable breathe/floaty and to reduce sheetIn/toastIn/fadeIn to instant (or a short opacity-only fade). Since these animations are applied via inline style in the template, add a reduced-motion rule that overrides animation to none on those elements.",
+  "effort": "S",
+  "affectedRoutes": [
+   "home",
+   "products",
+   "checkout",
+   "refill"
+  ]
+ },
+ {
+  "title": "Small touch targets — the edit-name pencil is sub-24px (fails), qty steppers are 28-32px",
+  "category": "interaction",
+  "changeType": "other",
+  "severity": "medium",
+  "evidence": "Profile edit-name button (markup L639) has no width/height — just a 14px SVG with no padding, giving a ~14-18px target, below the 24px minimum. Detail qty buttons are 32px (L196/L198), cart qty buttons 28px (L274/L276), and the address kebab (L770) and remove buttons are 32px. Several text buttons ('ویرایش شماره' L338, 'تغییر آدرس' L556) are line-height sized.",
+  "userImpact": "The edit-name control fails the AA minimum target size, and the sub-44px steppers/kebab are hard to hit precisely — a real problem for the elderly and motor-impaired patients who are a core audience of a medical-oxygen shop. Mis-taps on qty/remove cause accidental cart changes. WCAG 2.5.8 Target Size Minimum (AA, 24px) for the pencil; 2.5.5 (AAA, 44px) for the rest.",
+  "recommendation": "Give the pencil an explicit ≥24px (ideally 44px) hit area; enlarge qty/kebab/remove controls to ~44px (via padding without changing icon size); ensure adjacent controls have spacing so their targets don't overlap.",
+  "effort": "S",
+  "affectedRoutes": [
+   "profile",
+   "detail",
+   "cart",
+   "addresses"
+  ]
+ },
+ {
+  "title": "Phone/name/search inputs lack type and autocomplete tokens, and no <form> means Enter never submits",
+  "category": "forms",
+  "changeType": "other",
+  "severity": "medium",
+  "evidence": "Phone fields use inputmode=numeric but not type=tel or autocomplete=tel: auth L330, refill L453, used L504, checkout L568. The name field L646 lacks autocomplete=name; the search field L116 is a text input (not type=search). No <form> element wraps any input in markup_only.html, so there is no implicit submit — pressing Enter in the phone or discount field does nothing. (Credit: the OTP field L341 correctly sets autocomplete=one-time-code + inputmode=numeric.)",
+  "userImpact": "Users lose browser/OS autofill for their phone and name, and cannot submit the phone-login or discount step with the keyboard Enter key — they must locate and press the button, which is slower for keyboard/AT users and anyone on a mobile keyboard. WCAG 1.3.5 Identify Input Purpose (AA); keyboard-submit usability.",
+  "recommendation": "Set type=tel autocomplete=tel on phone fields, autocomplete=name on the name field, type=search enterkeyhint=search on the search field, and wrap each step's fields in a <form> with an onsubmit handler so Enter triggers the primary action.",
+  "effort": "S",
+  "affectedRoutes": [
+   "auth",
+   "checkout",
+   "refill",
+   "usedSale",
+   "products",
+   "profile"
+  ]
+ },
+ {
+  "title": "Decorative SVG icons are not hidden from assistive tech",
+  "category": "accessibility",
+  "changeType": "other",
+  "severity": "low",
+  "evidence": "Every inline <svg> across the template (e.g. markup L45/L48 theme icons, L69/L76 quick-action icons, L115 search glyph, L916 nav icons) omits aria-hidden=true and focusable=false. Where a button already has a visible label or aria-label the icon is redundant noise; where used as the sole content it can be announced as an unnamed 'image'.",
+  "userImpact": "Screen readers may announce decorative graphics as 'image' or 'graphic', cluttering the reading experience, and in older IE/Edge focusable SVGs can add stray tab stops. WCAG 1.1.1 Non-text Content (A) hygiene.",
+  "recommendation": "Add aria-hidden=true and focusable=false to all decorative SVGs; give an accessible name to the parent control instead of the SVG. For the few icons that carry meaning on their own, add role=img with a <title>.",
+  "effort": "S",
+  "affectedRoutes": [
+   "home",
+   "products",
+   "detail",
+   "cart",
+   "profile"
+  ]
+ },
+ {
+  "title": "Add a persistence/hydration layer — reload wipes cart, auth, orders, addresses, wishlist",
+  "category": "state",
+  "changeType": "change-state",
+  "severity": "critical",
+  "evidence": "script_2.js L3-28: `state` is a plain in-memory object; there is no localStorage/IndexedDB/sessionStorage anywhere. Cart (`cart` L4), auth (`loggedIn/userName/phone` L16), `orders`/`requests` (L20), `addresses` (L8-11), `wish` (L4), and theme (`theme()` L141 falls back to prop default) all live only in memory. The runtime brief confirms 'state is entirely in-memory — resets on reload'.",
+  "userImpact": "This is a PWA for a medical-oxygen shop where users may be mid-purchase for an urgent need. Any reload, tab suspension, backgrounding, OS memory reclaim, or accidental browser Back (which exits the app entirely — there is no URL routing) silently discards the entire cart, login session, saved addresses, order history, and in-progress service requests. On mobile, backgrounded PWAs are killed routinely, so this is not an edge case — a user who assembles a cart, gets a phone call, and returns finds an empty app with no explanation.",
+  "recommendation": "Introduce a persistence boundary: serialize the durable slices of state (cart, wish, addresses, auth token/session, orders, requests, theme) to localStorage on change (debounced) and hydrate them in `componentDidMount` before first render. Keep transient/UI slices (sheet, addrMenuId, editingName, form errors, route) out of persistence. Version the stored blob so schema changes can migrate. Persist theme separately so it applies before paint to avoid a flash.",
+  "effort": "L",
+  "affectedRoutes": [
+   "cart",
+   "checkout",
+   "profile",
+   "orders",
+   "requests",
+   "addresses",
+   "wishlist",
+   "auth"
+  ]
+ },
+ {
+  "title": "Logout leaves the previous user's data in memory — orders/addresses/wishlist bleed into the next login",
+  "category": "state",
+  "changeType": "change-state",
+  "severity": "high",
+  "evidence": "`logout` (script_2.js L612) clears only `loggedIn/userName/phone`; it does NOT clear `orders`, `requests`, `addresses`, `wish`, or `cart`. `verifyOtp` (L216-233) on a new login sets the new `phone` but inherits whatever `orders`/`addresses` are already in state. Seed addresses (L8-11) and any accumulated orders survive the logout→login transition.",
+  "userImpact": "On a shared or demo device: user A places an order and saves a home address, logs out; user B logs in with a different phone number and sees user A's order history, saved home/work addresses (with map pins to A's actual location), and wishlist as if their own — a privacy leak and a data-integrity bug. Even single-user, the logged-out→logged-in identity is inconsistent (phone changes but records don't).",
+  "recommendation": "Define account-scoped vs device-scoped state explicitly. On logout, clear all account-scoped slices (orders, requests, addresses, wishlist; decide cart policy) or key them by user id and swap on login. Treat login as loading a session, not just flipping a boolean.",
+  "effort": "M",
+  "affectedRoutes": [
+   "profile",
+   "orders",
+   "requests",
+   "addresses",
+   "wishlist",
+   "auth"
+  ]
+ },
+ {
+  "title": "No pending/loading states — instant fake transitions will become double-fireable the moment real async is added",
+  "category": "state",
+  "changeType": "change-state",
+  "severity": "high",
+  "evidence": "Every 'network-shaped' action is fully synchronous and offers no in-flight feedback: `sendOtp` (L210), `verifyOtp` (L216), `placeOrder` (L308), `applyDisc` (L528), `submitRefill` (L253), `submitUsed` (L265). Their buttons (markup L332, L344, L308, L286, L465, L520) have no disabled/spinner/pending styling. There is no submit guard; today double-submission is prevented ONLY incidentally, because the synchronous `setState` route-switch (e.g. `placeOrder`→`success`) unmounts the button before a second tap dispatches.",
+  "userImpact": "Users get no acknowledgement that an action is working (fine while fake, jarring once a real OTP/order round-trip adds latency). More importantly, the instant a real async call replaces any of these — the exact change the app needs — the button stays mounted during the await and a double-tap fires the handler twice: two OTP sends, a duplicate order, or a second submission with a now-cleared form.",
+  "recommendation": "Add an explicit request lifecycle (idle→pending→success/error) per async action; disable the CTA and show an inline spinner while pending; guard handlers with an in-flight flag. Build this now so the transition to a real backend is a drop-in.",
+  "effort": "M",
+  "affectedRoutes": [
+   "auth",
+   "checkout",
+   "cart",
+   "refill",
+   "usedSale"
+  ]
+ },
+ {
+  "title": "Toast is the sole feedback channel — single, ephemeral (2400ms), and undismissable",
+  "category": "interaction",
+  "changeType": "change-state",
+  "severity": "medium",
+  "evidence": "`toast()` (script_2.js L157-161) keeps one timer (`_toastT`), overwrites `toastMsg`, and auto-hides after 2400ms. The toast element (markup L905-909) is `pointer-events:none`, so it can't be tapped or dismissed. Nearly every state confirmation routes through it: login success ('با موفقیت وارد شدید' L228), add-to-cart, address delete/edit, discount applied, name saved, inquiry submitted.",
+  "userImpact": "Rapid actions overwrite each other (only the last toast shows); a user who glances away misses the only confirmation entirely; there is no history to check 'did that go through?'. For consequential confirmations (order-adjacent, login, address deletion) a 2.4s fire-and-forget pill is too weak, and because it's non-interactive it can't host an Undo affordance.",
+  "recommendation": "Reserve toasts for low-stakes confirmations; for consequential actions use persistent, dismissible, optionally actionable notifications (with Undo where relevant). Support a short queue instead of clobbering. Consider inline success states on the originating control (e.g. checkmark on the add button) so feedback is co-located with the action.",
+  "effort": "M",
+  "affectedRoutes": [
+   "cart",
+   "detail",
+   "addresses",
+   "profile",
+   "auth"
+  ]
+ },
+ {
+  "title": "Destructive actions are immediate and irreversible — no confirm, no undo",
+  "category": "state",
+  "changeType": "change-state",
+  "severity": "high",
+  "evidence": "`deleteAddr` (L280-289) removes an address immediately (only guard: keep ≥1); cart-item `remove` (L392) and the `dec`-below-1 path (L389) delete the line instantly; `unwish` (L194) removes a wishlist item instantly; photo `tl.remove` (L422) drops an uploaded image. None prompt for confirmation or offer undo — they only fire a fleeting toast.",
+  "userImpact": "A mis-tap on the trash icon permanently deletes a saved delivery address (including its map pin) or the last cart item with no recovery; on a small mobile target next to the quantity stepper this is easy to hit. The 2.4s non-interactive toast can't even offer 'Undo'.",
+  "recommendation": "For irreversible deletes (address) require a confirm step; for reversible list removals (cart line, wishlist, photo) do an optimistic remove backed by an actionable 'Undo' notification that restores the item if tapped within a few seconds. Consider swipe-to-delete affordance instead of an always-live trash button.",
+  "effort": "M",
+  "affectedRoutes": [
+   "cart",
+   "addresses",
+   "wishlist",
+   "refill",
+   "usedSale"
+  ]
+ },
+ {
+  "title": "Cart quantity is silently clamped to stock, but the 'added to cart' toast still fires",
+  "category": "state",
+  "changeType": "change-state",
+  "severity": "medium",
+  "evidence": "`addToCart` (L163-169) computes `next = Math.min(cur + n, p.stock)` then unconditionally toasts 'به سبد خرید اضافه شد'. The cart `inc` (L387) and detail `incQty` (L507) also `Math.min(..., stock)`. Reproducible: for `oxy5` (stock 4), add 4, then tap add/`+` again — state is unchanged but the toast still says 'added', and the `+` stepper at the ceiling is a silent no-op.",
+  "userImpact": "The user is told the item was added when nothing changed, and the stepper appears broken (tapping + does nothing) with no explanation that they hit the stock limit. They may assume the app is buggy or that they've added more than they have.",
+  "recommendation": "When the clamp bites, suppress the success toast and instead surface a clear 'حداکثر موجودی: N' message; visually disable the `+`/add control at the ceiling. Only confirm 'added' when the quantity actually increased.",
+  "effort": "S",
+  "affectedRoutes": [
+   "products",
+   "detail",
+   "cart"
+  ]
+ },
+ {
+  "title": "Scroll always jumps to top on route change — no scroll restoration on back-navigation",
+  "category": "navigation",
+  "changeType": "change-pages",
+  "severity": "medium",
+  "evidence": "`componentDidUpdate` (script_2.js L76-80): `if (prevState.route !== this.state.route) window.scrollTo(0, 0)` fires on EVERY route change, including returning to a previous screen. There is no per-route saved scroll offset.",
+  "userImpact": "A user scrolls deep into the product list, opens a product, taps the back chevron — and the list is reset to the top, losing their place. Same for returning to a long form or orders list. This is a well-known mobile-commerce frustration and discourages browsing.",
+  "recommendation": "Distinguish forward navigation (scroll to top) from back navigation (restore the saved offset). Maintain a small per-route scroll-position map; on entering a route, restore its offset if returning, else scroll to top.",
+  "effort": "M",
+  "affectedRoutes": [
+   "products",
+   "detail",
+   "orders",
+   "requests",
+   "wishlist",
+   "cart"
+  ]
+ },
+ {
+  "title": "Guest checkout/service resume-submit can be silently abandoned mid-flow",
+  "category": "navigation",
+  "changeType": "both",
+  "severity": "high",
+  "evidence": "A guest submitting refill goes through `submitRefill`→`goAuthFor('refill','refill','refill')` (L262), stashing `pendingSubmit:'refill'`; `verifyOtp` (L223-231) later runs the pending submit. But the bottom nav stays live on the auth interstitial (`activeMap` folds auth→profile, L439), and entering auth any other way via `goAuth`→`goAuthFor('profile','profile')` (L485) resets `pendingSubmit:null`. `authBack` (L572) returns to the form but never clears `pendingSubmit`.",
+  "userImpact": "Mid-submission, the user taps a bottom-nav tab (still visible on the auth screen), lands on e.g. profile as a guest, taps 'login', completes OTP — and instead of their refill request being submitted, `pendingSubmit` was reset to null so the request is silently dropped. Their filled form still sits in state with no indication it was never sent; they believe they submitted a request they didn't.",
+  "recommendation": "Treat the auth interstitial as a modal step in the originating flow: hide/disable the bottom nav during it, or preserve `pendingSubmit` across auth entry points and resume the intended action after login. Surface a persistent 'ادامه ثبت درخواست پس از ورود' banner so the pending intent is visible and recoverable.",
+  "effort": "M",
+  "affectedRoutes": [
+   "auth",
+   "checkout",
+   "refill",
+   "usedSale"
+  ]
+ },
+ {
+  "title": "Transient overlay/edit UI state is not reset on route transitions — it bleeds across pages",
+  "category": "state",
+  "changeType": "both",
+  "severity": "medium",
+  "evidence": "Nothing in `componentDidUpdate` (L76-80) resets transient UI flags on route change. `editingName` (L608-611) stays true; the filter `sheet` (L496-498) and `addrSheet` (L544-552) overlays render as siblings of all routes and stay open; `addrMenuId` (L413-415) keeps a 3-dot popover open. Reproducible: in profile tap edit-name, then tap a bottom-nav tab and return — the name field is still in edit mode.",
+  "userImpact": "Users find overlays or edit modes stuck open on screens where they don't belong (e.g. the filter/address bottom sheet still covering a new route after navigating), or a half-typed name edit re-appearing later. It feels buggy and can obscure content or trap interaction.",
+  "recommendation": "On route change, reset transient UI state (close sheets/menus, exit inline edits, clear submit-time form errors that shouldn't survive leaving the screen). Scope these flags to the screen that owns them rather than global state.",
+  "effort": "S",
+  "affectedRoutes": [
+   "profile",
+   "products",
+   "addresses",
+   "checkout",
+   "refill"
+  ]
+ },
+ {
+  "title": "No progressive validation — fields never validate until submit",
+  "category": "forms",
+  "changeType": "change-state",
+  "severity": "medium",
+  "evidence": "Errors are only ever SET inside submit handlers (`submitRefill` L254-261, `submitUsed` L266-275, `saveAddr` L293-294, `sendOtp` L211, `verifyOtp` L218-219); every `on*` input handler (e.g. `onRfPhone` L579, `onUsPrice` L589, `onAdText` L554, `onAuthPhone` L564) only CLEARS the relevant error and never sets one. (Note: inputs update state live — the runtime compiles `onchange`→React `onChange`, which fires per keystroke — so this is a validation-timing gap, not an input-lag gap.)",
+  "userImpact": "A user can fill an entire multi-field form (photos, gas type, delivery, address, phone) with an invalid phone or too-short description and get no signal until they tap submit, at which point they're bounced back with a generic 'لطفاً موارد مشخص‌شده را تکمیل کنید' toast and must hunt for the red messages. This is slower and more error-prone, especially on the longer refill/used-sale forms.",
+  "recommendation": "Validate progressively: mark a field valid/invalid on blur or after first submit-attempt, and clear the error live as the user corrects (already wired). Disable the submit CTA until required fields are minimally valid, and on a failed submit scroll to / focus the first invalid field instead of relying on a generic toast.",
+  "effort": "M",
+  "affectedRoutes": [
+   "refill",
+   "usedSale",
+   "addresses",
+   "auth"
+  ]
+ },
+ {
+  "title": "No error/network states — offline map tiles and any failed request degrade silently",
+  "category": "state",
+  "changeType": "change-state",
+  "severity": "medium",
+  "evidence": "`manageMaps` (L94-139) loads tiles from `basemaps.cartocdn.com` (L105, L133); its only resilience is a retry when `window.L` is missing (L96) — there is no handling for tile-fetch failure. `placeOrder`, `sendOtp`, `verifyOtp`, and the form submits have no error branch at all. The app targets offline PWA use, where external tiles won't load.",
+  "userImpact": "Offline or on a flaky connection, the checkout/refill/address maps render as a blank/broken box with just a floating pin and no explanation, undermining trust in the address the user is confirming. And because no submission path can express failure, a future real backend error would leave the user on a spinner-less screen with no idea whether their order/request succeeded.",
+  "recommendation": "Give the map a graceful fallback (cached/static tiles or a 'نقشه در دسترس نیست' placeholder showing the address text/coords) on tile error. Add an explicit error state to every async action with a retry affordance, so failures are visible and recoverable.",
+  "effort": "M",
+  "affectedRoutes": [
+   "checkout",
+   "refill",
+   "addresses"
+  ]
+ },
+ {
+  "title": "Adopt an explicit state-transition + feedback model as the framework for the above",
+  "category": "architecture",
+  "changeType": "change-state",
+  "severity": "high",
+  "evidence": "The app currently mutates a flat in-memory bag (script_2.js L3-28) with ad-hoc `setState` calls and a single toast for all feedback; there is no notion of request lifecycle, optimistic/rollback, undo, or persistence. All the state defects in this review share this root cause.",
+  "userImpact": "Without a shared model, each new real interaction (payment, OTP, live inventory) will re-invent loading/error handling inconsistently, and users will keep hitting silent failures, lost work, and ambiguous confirmations.",
+  "recommendation": "Standardize four things across every state-changing action: (1) an async lifecycle idle→pending→success/error with disabled CTAs + inline spinners and per-action error surfaces; (2) optimistic updates with rollback for reversible mutations (cart qty, wishlist, address edits); (3) confirmations as persistent, dismissible, optionally-actionable notifications with Undo, replacing fire-and-forget toasts; (4) a persistence/hydration boundary (localStorage now, server-synced later) that separates durable state (cart, auth session, orders, addresses, wishlist, theme) from transient UI state (route, sheets, menus, edit flags, form errors). Encode transitions centrally rather than scattering setState calls.",
+  "effort": "L",
+  "affectedRoutes": [
+   "cart",
+   "checkout",
+   "auth",
+   "refill",
+   "usedSale",
+   "addresses",
+   "wishlist",
+   "profile"
+  ]
+ },
+ {
+  "title": "An applied discount can't be removed and its state is sticky",
+  "category": "interaction",
+  "changeType": "change-state",
+  "severity": "low",
+  "evidence": "`applyDisc` (L528-532) sets `disc:'EMDAD10'`; there is no control to clear it — `onDiscInput` (L527) only clears the error, and `hasDisc` (L524) stays true until `placeOrder` wipes it (L315). The discount silently recomputes via `cartTotals` (L178) as the cart changes.",
+  "userImpact": "Once a code is applied the user can't back it out (e.g. to try a different code or see the pre-discount total); the input still shows the old code text with no 'applied/remove' affordance, which is confusing and looks like a dead control.",
+  "recommendation": "Render an applied-discount chip with a clear 'remove' (✕) action that resets `disc`/`discInput`; disable the input while a code is applied, and give the field an explicit applied/removable state instead of leaving stale text.",
+  "effort": "S",
+  "affectedRoutes": [
+   "cart"
+  ]
+ },
+ {
+  "title": "Cart has a nav badge but wishlist has no at-a-glance count outside the profile menu",
+  "category": "state",
+  "changeType": "change-state",
+  "severity": "low",
+  "evidence": "`navs` (L442-447) sets `showBadge` only on the cart tab (`t.count`). The wishlist count exists solely as a `menuRows` badge inside profile (L456); there is no wishlist entry point or counter in the primary bottom nav. Both cart and wish are live in the same state, so there's no desync — the gap is discoverability, not sync.",
+  "userImpact": "A user who saved items to their wishlist gets no persistent reminder of them while browsing (unlike the cart badge), so saved items are easily forgotten — reducing return-to-purchase, the whole point of a wishlist.",
+  "recommendation": "Surface the wishlist count where users browse — e.g. a small badge on the detail-screen heart or a count on a wishlist affordance in the header/nav — so saved-item state is visible outside the profile drill-down. If wishlist is intentionally secondary, make that a conscious decision rather than an accident of nav layout.",
+  "effort": "S",
+  "affectedRoutes": [
+   "products",
+   "detail",
+   "wishlist",
+   "profile"
+  ]
+ },
+ {
+  "title": "Primary CTAs hardcode color:#fff instead of --onp, failing dark-mode contrast",
+  "category": "visual",
+  "changeType": "other",
+  "severity": "high",
+  "evidence": "Every primary button hardcodes color:#fff (markup_only.html L237, L261, L308, L332, L344, L520, L594, L629, L697, L729, L813, L859, L899) while the design system defines --onp for on-primary ink (style_3.css L29: dark --onp:#04201c). In dark theme --p is #0e9a8b; white text on it computes to ~3.5:1 contrast — below WCAG AA 4.5:1 for the 14.5px bold CTA label (which is under the 18.66px large-text threshold). The intended --onp #04201c on the same teal yields ~5:1 and passes.",
+  "userImpact": "On the default (dark) theme, the label on every add-to-cart / checkout / place-order / submit button is hard to read for low-vision users and in bright ambient light — the highest-frequency action on a commerce app is the least legible. It is also a token-contract violation: --onp is dead code, so the system's own dark-mode intent never ships.",
+  "recommendation": "Replace color:#fff with color:var(--onp) on all primary-filled buttons so on-primary ink flips per theme; keep #fff only where a button sits on a hardcoded gradient. Add a regression check that primary CTA text meets 4.5:1 in both themes.",
+  "effort": "M",
+  "affectedRoutes": [
+   "detail",
+   "cart",
+   "checkout",
+   "success",
+   "auth",
+   "usedSale",
+   "profile",
+   "orders",
+   "requests",
+   "wishlist",
+   "products"
+  ]
+ },
+ {
+  "title": "No spacing/radius/type-scale tokens — every dimension is an inline magic number",
+  "category": "architecture",
+  "changeType": "other",
+  "severity": "high",
+  "evidence": "style_3.css defines only color/effect tokens; there is no --radius, --space, or type token (confirmed brief_design-system-mapper §1). All sizing is inline: font-sizes span 10/10.5/11/11.5/12/12.5/13/13.5/14/14.5/15/16/17/18/19/20/24px (fractional half-pixel values like 13.5/14.5 are on no scale), and paddings are ad-hoc (e.g. markup L67 '16px 14px', L361 '18px 16px', L571 '14px', L546 '16px 16px 170px').",
+  "userImpact": "There is no vertical rhythm and no single source of truth for spacing/rounding/type, so screens feel subtly uneven and any future change must be hand-applied across dozens of literals — guaranteeing further drift as the prototype grows.",
+  "recommendation": "Introduce --space-* (4/8/12/16/20/24), --r-sm/md/lg/xl (12/16/20/24), and a type scale (--fs-xs…--fs-2xl) in style_3.css, then replace inline literals. Snap the fractional sizes onto the scale.",
+  "effort": "L",
+  "affectedRoutes": [
+   "home",
+   "products",
+   "detail",
+   "cart",
+   "checkout",
+   "services",
+   "refill",
+   "usedSale",
+   "profile",
+   "orders",
+   "requests",
+   "addresses",
+   "wishlist",
+   "auth",
+   "success",
+   "formSuccess"
+  ]
+ },
+ {
+  "title": "Crosshatch placeholders instead of real product imagery",
+  "category": "trust-content",
+  "changeType": "other",
+  "severity": "high",
+  "evidence": "Every product image is a CSS crosshatch (repeating-linear-gradient) — home L90, products L133, detail hero L178, cart L268, related L226, wishlist L819 — and the detail hero carries a literal 'product photo · تصویر محصول' label (L179) plus three static carousel dots (L181-185) that never change because there is only one placeholder.",
+  "userImpact": "For a shop selling physical oxygen cylinders, concentrators and masks, buyers cannot see what they are purchasing — the single largest trust/conversion gap in the visual layer. The fake 3-dot carousel also implies a gallery that does not exist, which reads as broken.",
+  "recommendation": "Add a product.images[] pipeline with fixed aspect-ratio boxes, lazy loading, and the crosshatch demoted to a loading skeleton only. Bind the detail carousel + dot count to the real image array (hide dots when a single image).",
+  "effort": "L",
+  "affectedRoutes": [
+   "home",
+   "products",
+   "detail",
+   "cart",
+   "wishlist"
+  ]
+ },
+ {
+  "title": "Fixed bottom CTA overlays mid-form content and leaves a large void on short screens",
+  "category": "visual",
+  "changeType": "other",
+  "severity": "high",
+  "evidence": "The floating CTA wrapper is position:fixed;pointer-events:none with a transparent background and only the pill is opaque (markup L463-467 refill, L306 cart, L235 detail, L592 checkout, L518 used). Because the wrapper is transparent, any field the user scrolls past bleeds under the pill — on the dense refill form the CTA visibly overlaps the phone field (ground-truth). On short screens (cart with 1 item, success/services) the CTA is pinned near the bottom while content sits at the top, leaving a big empty gap.",
+  "userImpact": "Users lose sight of a form field behind an opaque button (data-entry confusion) on long forms, and see an awkward disconnected void on short ones — the same pattern fails in both directions.",
+  "recommendation": "Give the fixed CTA an opaque or gradient-scrim backdrop so overlapped content is never confusingly half-visible, and tie the scroll container's padding-bottom to the CTA height via a token. Better: make the action a sticky bar inside a min-height:100dvh flex column (content flex:1) so it hugs content when short instead of floating.",
+  "effort": "M",
+  "affectedRoutes": [
+   "refill",
+   "cart",
+   "detail",
+   "checkout",
+   "usedSale"
+  ]
+ },
+ {
+  "title": "Duplicated inline component patterns have already diverged in size",
+  "category": "architecture",
+  "changeType": "other",
+  "severity": "medium",
+  "evidence": "Identical-intent elements are copy-pasted at different dimensions: add-to-cart round button is 40x40 on products (L148) but 36x36 on wishlist (L827); the qty stepper +/- buttons are 32x32 on detail (L196-198) but 28x28 on cart (L274-276); photo-upload tiles are 84x84 on refill (L400/L406) but 72x72 on used-sale (L483/L489); card radius appears as 14/16/18/20/24px for the same 'surface card' (L225 vs L132 vs L67 vs L361 vs L53).",
+  "userImpact": "The same control feels different from screen to screen, undermining the polished impression; and because each instance is an independent literal, every future edit risks widening the drift.",
+  "recommendation": "Extract a small set of style factories or CSS component classes (.card, .chip, .icon-btn, .stepper-btn, .fab, .back-btn) with token-driven sizes, and replace the duplicated inline strings.",
+  "effort": "L",
+  "affectedRoutes": [
+   "products",
+   "wishlist",
+   "detail",
+   "cart",
+   "refill",
+   "usedSale"
+  ]
+ },
+ {
+  "title": "Active bottom-tab state is signaled by color+weight only",
+  "category": "visual",
+  "changeType": "change-state",
+  "severity": "medium",
+  "evidence": "navs sets the active tab to 'color:var(--p);font-weight:800' vs inactive 'color:var(--tx2)' (script_2.js L444) with no pill, underline/indicator bar, or icon-fill change. In dark theme this is --p #0e9a8b vs --tx2 #9fc0ba on a 10px label (markup L921) — a low-contrast delta on tiny text.",
+  "userImpact": "Users get a weak, easy-to-miss cue about where they are in the app — the primary navigation-state signal is under-communicated, especially in dark mode and for low-vision users.",
+  "recommendation": "Add a stronger active affordance: filled/duotone icon on active, a small top indicator bar or a soft --p-soft pill behind the active item, in addition to color+weight. Ensure the active vs inactive label contrast is clearly distinguishable.",
+  "effort": "S",
+  "affectedRoutes": [
+   "home",
+   "products",
+   "services",
+   "cart",
+   "profile"
+  ]
+ },
+ {
+  "title": "Route-entrance animation is applied to only 2 of 17 routes",
+  "category": "visual",
+  "changeType": "change-pages",
+  "severity": "low",
+  "evidence": "The fadeIn keyframe (style_3.css L57) is attached only to success (markup L601) and formSuccess (L527) content (plus the address popover L775 and scrims); the other 15 routes swap instantly (ground-truth: 'instant swaps, no visible route-transition animation').",
+  "userImpact": "Navigation feels abrupt and inconsistent — two screens gently fade in while the rest hard-cut, so transitions read as unfinished rather than intentional, and users get no motion cue that the page changed.",
+  "recommendation": "Apply one consistent, short route-transition (e.g. fadeIn .18s) to every route container via the runtime on route change, and gate it behind prefers-reduced-motion. Remove the one-off fades so the treatment is uniform.",
+  "effort": "M",
+  "affectedRoutes": [
+   "home",
+   "products",
+   "detail",
+   "cart",
+   "checkout",
+   "services",
+   "refill",
+   "usedSale",
+   "profile",
+   "orders",
+   "requests",
+   "addresses",
+   "wishlist",
+   "auth",
+   "success",
+   "formSuccess"
+  ]
+ },
+ {
+  "title": "--line divider is near-invisible in the light theme",
+  "category": "visual",
+  "changeType": "other",
+  "severity": "medium",
+  "evidence": "Light --line is rgba(255,255,255,.85) — an almost-opaque white (style_3.css L11). It is used as the border on every card, the bottom-nav top border (L911), the sheet drag handle (L844), and dashed separators in the spec list (L212) and totals (L297, L588). On the near-white glass surfaces these edges/dividers effectively disappear.",
+  "userImpact": "In light mode, cards lose their containment, the totals/spec rows lose their separating lines, and the tab bar loses its top edge — the layout reads as flat and ungrouped, hurting scannability of prices and summaries.",
+  "recommendation": "Split the token: keep the bright rim only where it's a glass-edge highlight, and add a real divider token for light theme (e.g. rgba(8,48,43,.12)) for card borders and separators so they render as visible hairlines in both themes.",
+  "effort": "S",
+  "affectedRoutes": [
+   "products",
+   "detail",
+   "cart",
+   "checkout",
+   "orders",
+   "requests",
+   "addresses",
+   "profile"
+  ]
+ },
+ {
+  "title": "Muted --tx2 text on translucent glass over the moving aurora is low/unstable contrast",
+  "category": "accessibility",
+  "changeType": "other",
+  "severity": "medium",
+  "evidence": "Secondary text uses --tx2 (#48706a light) at very small sizes over --sur (rgba(255,255,255,.62)) which backdrop-blurs the animated aurora behind it — e.g. currency unit 'تومان' at 10.5px (L98), product meta 11.5px (L136), captions/hints 11-11.5px (L40, L72, L367). Placeholders drop further to opacity .8 (style_3.css L54). The effective background shifts as the aurora animates, so contrast is non-deterministic and can dip below AA.",
+  "userImpact": "Prices' currency units, product metadata and form helper text can become hard to read as colored blobs drift behind the frosted panels — the information most users skim (price context, hints) is the least reliable to read.",
+  "recommendation": "Raise the opacity of text-bearing surfaces (e.g. --sur to ~.8) or darken --tx2, and verify --tx2 hits ≥4.5:1 against the worst-case aurora tint. Avoid <11px for meaningful text.",
+  "effort": "M",
+  "affectedRoutes": [
+   "home",
+   "products",
+   "detail",
+   "cart",
+   "checkout",
+   "refill",
+   "usedSale",
+   "profile"
+  ]
+ },
+ {
+  "title": "Two competing primary-CTA fills, and the accent CTA gets no glow",
+  "category": "visual",
+  "changeType": "other",
+  "severity": "medium",
+  "evidence": "The refill submit button uses background:var(--acc);color:#06343a (markup L465) while the semantically identical used-sale submit uses background:var(--p);color:#fff (L520). The primary-glow hook only matches var(--p) buttons (style_3.css L49), so the accent refill CTA renders visually lighter (no glow) than every other primary CTA.",
+  "userImpact": "The same 'submit this form' action looks like a different-tier button on two sibling screens, and the odd-one-out lacks the elevation glow — inconsistent CTA hierarchy that makes the design feel unsystematic.",
+  "recommendation": "Pick one CTA fill for the primary submit action across forms. If accent is intentionally reserved for 'services', make it a systematic accent-CTA variant with a matching --glow-acc so it carries equal visual weight.",
+  "effort": "S",
+  "affectedRoutes": [
+   "refill",
+   "usedSale"
+  ]
+ },
+ {
+  "title": "Hero and logo use hardcoded gradients that ignore the dark theme",
+  "category": "visual",
+  "changeType": "other",
+  "severity": "medium",
+  "evidence": "The home logo tile uses linear-gradient(140deg,#0b8a78,#16c9a6) (markup L37) and the hero card uses linear-gradient(140deg,#065f57,#0b8a78,#16c9a6) (L53) — literal hexes, not tokens. #16c9a6 is not a token at all, and these gradients are identical in light and dark, so in dark mode the hero/logo stay bright-teal against the deep-dark aurora.",
+  "userImpact": "The home screen's most prominent surfaces look 'stuck in light mode' in dark theme, breaking the otherwise theme-aware aesthetic and the brand's cohesion at the very first impression.",
+  "recommendation": "Tokenize the brand gradient (e.g. --grad-hero with per-theme stops derived from --p/--p-deep/--acc) and reference it inline, so the hero and logo re-skin with the theme and any accent override.",
+  "effort": "M",
+  "affectedRoutes": [
+   "home"
+  ]
+ },
+ {
+  "title": "Heading typography is inconsistent (tag, font, weight, tracking)",
+  "category": "visual",
+  "changeType": "other",
+  "severity": "medium",
+  "evidence": "Sub-page titles are plain <div style='font-weight:900;font-size:17px'> (markup L173, L321, L394, L551, L691, L723, L755, L807) so they render in Vazirmatn, while products/cart use <h1> at 20px which the CSS maps to the Baloo display font (style_3.css L51). Baloo only ships weights 500-800 from identical files (brief_design-system-mapper §3), yet headings request font-weight:900 (e.g. home hero L60) — an unavailable weight. The h1,h2 rule also applies letter-spacing:-.4px, tightening connected Persian/Arabic script.",
+  "userImpact": "Screen titles look and feel different depending on whether they came from a header page or a back-row page (different font + size), display weight variation is unreliable, and negative tracking can degrade legibility of the joined Persian letterforms.",
+  "recommendation": "Standardize screen titles to a single heading element/level so the display font applies uniformly; map heading weights to weights Baloo actually provides; and remove or zero the negative letter-spacing for the Arabic/Persian subset.",
+  "effort": "M",
+  "affectedRoutes": [
+   "detail",
+   "auth",
+   "refill",
+   "usedSale",
+   "checkout",
+   "orders",
+   "requests",
+   "addresses",
+   "wishlist",
+   "products",
+   "cart",
+   "home",
+   "services"
+  ]
+ },
+ {
+  "title": "Price emphasis is weak and inconsistent across screens",
+  "category": "visual",
+  "changeType": "other",
+  "severity": "medium",
+  "evidence": "Price sizes/weights differ by screen: products 14.5px/800 (L141) barely outranks its own 13.5px/700 title (L135); detail 19px/900 (L193); home featured 14px/800 (L97); cart line total 12px in --tx2 (L271); wishlist 12.5px/800 (L823). The 'تومان' unit is repeated in small --tx2 everywhere, adding visual noise.",
+  "userImpact": "On a commerce app the price should be an obvious focal point, but on list rows it competes with the title and on the cart it is de-emphasized muted text — users have to hunt for the number that matters most, and the repeated unit clutters each row.",
+  "recommendation": "Define one price type-style (size/weight/color) with a consistently muted, smaller unit, and apply it everywhere a price appears so price always reads as the primary figure in a row.",
+  "effort": "M",
+  "affectedRoutes": [
+   "home",
+   "products",
+   "detail",
+   "cart",
+   "wishlist"
+  ]
+ },
+ {
+  "title": "Chip and badge sizing follows ~6 different ad-hoc formulas",
+  "category": "visual",
+  "changeType": "other",
+  "severity": "low",
+  "evidence": "Category chips are height:34px;padding:0 14px;font-size:12px (script L349); the 'فقط موجود ✕' clear chip is height:34px;padding:0 12px (markup L127); status chips are padding:4px 12px;font-size:10.5px (L138, L705); the 'استعلام قیمت' inquiry chip appears as padding:5px 10px/11px on home (L101), padding:6px 12px/11.5px on products (L144), and height:36px/12px as a button on detail (L206); the 'پیش‌فرض' badge is padding:2px 10px;font-size:10px (L767).",
+  "userImpact": "Pills that should read as one family (chips, status badges, inquiry tags) have visibly different heights, paddings and text sizes, giving the UI an inconsistent, hand-assembled feel.",
+  "recommendation": "Define chip size tokens (chip-sm / chip-md) and semantic variants (neutral / status / accent) and route all chips/badges through them.",
+  "effort": "M",
+  "affectedRoutes": [
+   "home",
+   "products",
+   "detail",
+   "orders",
+   "addresses",
+   "refill"
+  ]
+ },
+ {
+  "title": "Glass/blur is overused and the modal scrim is off-palette",
+  "category": "visual",
+  "changeType": "other",
+  "severity": "low",
+  "evidence": "Any --sur/--sur2 element is auto-frosted (style_3.css L46-48), including the fixed bottom nav (background:var(--sur), markup L911) whose 10px labels sit over blurred scrolling content, plus every card and both bottom sheets. The two full-screen scrims use rgba(15,12,40,.45) (L841, L865) — a dark indigo that is not derived from any teal token.",
+  "userImpact": "Stacked translucency + a 30px-blurred moving aurora reduces legibility of small nav labels and card text during scroll, and the indigo scrim tints the whole screen a color that is nowhere else in the palette, subtly clashing with the teal brand.",
+  "recommendation": "Give persistent chrome (bottom nav) a more opaque background and reserve heavy blur for transient overlays; replace the indigo scrim with a token derived from --bg/--tx (e.g. a dark-teal rgba) for palette consistency.",
+  "effort": "S",
+  "affectedRoutes": [
+   "home",
+   "products",
+   "services",
+   "cart",
+   "profile"
+  ]
+ },
+ {
+  "title": "Icon set drifts in stroke-width, size, and fill style",
+  "category": "visual",
+  "changeType": "other",
+  "severity": "low",
+  "evidence": "Icons share a 24-grid Feather/Lucide look but stroke-width varies: 2 (most), 2.2 (add buttons L149/L757/L828), 2.4 (success checks L529/L603), 1.9 (nav L916), 1.8 (empty cart L257). Icon pixel sizes are numerous one-offs (13,14,15,16,17,18,19,20,21,22,24,26,28,30,38), and the address 3-dot menu icon uses fill:currentColor circles (L771) while every other icon is stroke-based.",
+  "userImpact": "Icons render at inconsistent visual weights and sizes, so rows and headers don't align optically and the icon language feels slightly incoherent on close inspection.",
+  "recommendation": "Standardize on one stroke-width (e.g. 2 for content, 1.9 for nav), an icon-size scale (16/18/20/24), and a consistent stroke-vs-fill convention; centralize the shared <svg> wrapper so size/stroke come from tokens.",
+  "effort": "M",
+  "affectedRoutes": [
+   "products",
+   "detail",
+   "addresses",
+   "cart",
+   "success",
+   "home"
+  ]
+ },
+ {
+  "title": "Validate on blur and show positive/valid state, not only on submit",
+  "category": "forms",
+  "changeType": "change-state",
+  "severity": "high",
+  "evidence": "submitRefill (script_2.js L253-264), submitUsed (L265-278), saveAddr (L290-306), sendOtp/verifyOtp (L210-233) are the only places validation runs. The runtime maps onchange→React onChange (runtime brief L173) so per-keystroke handlers already exist (onRfPhone/onUsPrice/onAdText, etc.) and are used only to clear prior errors, never to validate.",
+  "userImpact": "A user fills an entire long form (refill has photos, gas, delivery, address, phone, notes) with no feedback that a field is wrong or right, then only discovers problems after tapping submit — a slow, guess-and-retry loop. There is also no 'valid' affordance (e.g. green tick on a correctly formatted phone), so users never get confirmation they got a field right.",
+  "recommendation": "Reuse the existing live onChange handlers: run per-field validators on blur (and re-validate live once a field has errored), render a per-field valid/invalid state (border color + check/error icon), and keep clearing errors live as it does now. This is a small extension of code already present.",
+  "effort": "M",
+  "affectedRoutes": [
+   "refill",
+   "usedSale",
+   "auth",
+   "checkout",
+   "addresses"
+  ]
+ },
+ {
+  "title": "Add error summary + auto-scroll/focus to first error on failed submit",
+  "category": "forms",
+  "changeType": "change-state",
+  "severity": "high",
+  "evidence": "On invalid submit the code sets rfErrs/usErrs (script_2.js L260/L274) and fires a generic toast 'لطفاً موارد مشخص‌شده را تکمیل کنید' (L261/L275). Inline messages themselves are specific (e.g. 'شماره موبایل معتبر وارد کنید'), but nothing scrolls to or focuses the first invalid field, and there is no summary.",
+  "userImpact": "On the long refill form with a position:fixed bottom CTA, the failing field (e.g. the photos error at the very top, markup L411) is often off-screen when the user taps submit at the bottom. They get a toast but must manually scroll the whole form hunting for the red text — high friction, easy to abandon.",
+  "recommendation": "On submit failure, scrollIntoView + focus the first field with an error and optionally render a tappable error summary at the top ('۲ مورد نیاز به اصلاح دارد'). Keep the toast as a secondary cue, not the only one.",
+  "effort": "M",
+  "affectedRoutes": [
+   "refill",
+   "usedSale",
+   "checkout",
+   "addresses"
+  ]
+ },
+ {
+  "title": "Guard submit CTAs with a disabled/pending state before flows become async",
+  "category": "forms",
+  "changeType": "change-state",
+  "severity": "medium",
+  "evidence": "No submit button uses a disabled or loading state (grep: the only disabled attr in the template is the out-of-stock CTA, markup L244). placeOrder (L308), submitRefill/submitUsed, saveAddr, sendOtp/verifyOtp have no re-entry guard.",
+  "userImpact": "Today a rapid double-tap is harmless because each handler synchronously changes route or closes the sheet, so the CTA unmounts before a second click lands (no duplicate orders/OTPs today). But the moment any of these become real (SMS send, payment, network POST), there is no guard — the very first real integration will allow duplicate orders/requests and duplicate OTP sends.",
+  "recommendation": "Introduce a submitting flag per form: disable the CTA and show an inline spinner/label ('در حال ثبت…') while a submit is in flight, re-enabling on success/error. Bake it into the shared submit path now so it is correct when the backend is wired.",
+  "effort": "S",
+  "affectedRoutes": [
+   "checkout",
+   "refill",
+   "usedSale",
+   "auth",
+   "addresses"
+  ]
+ },
+ {
+  "title": "Replace the mock photo counter with real file input, previews, and per-photo delete",
+  "category": "forms",
+  "changeType": "change-state",
+  "severity": "high",
+  "evidence": "rfAddPhoto/usAddPhoto just increment an int (script_2.js L576/L587); tiles() (L421-425) builds N identical placeholder objects whose remove is `() => this.setState({ [key]: n - 1 })`. Markup renders a static 'IMG' crosshatch tile (L400-402, L483-485) with no <input type=file> anywhere (grep-confirmed).",
+  "userImpact": "Photos are the entire point of both flows (refill = photo of the cylinder; used-sale = photo of the item), yet no image can actually be attached, and there is no thumbnail to confirm what was captured. The delete is also latently wrong: because remove always sets count = n-1, tapping ✕ on any tile removes the LAST photo, not the tapped one — invisible while all tiles are identical placeholders, but it will corrupt selection the instant real thumbnails exist.",
+  "recommendation": "Use a real <input type=file accept=image/* multiple capture=environment>, render object-URL thumbnails, track photos as an array (not a count), delete by id/index, and support a designated cover photo (and ideally reorder). Show upload progress per tile.",
+  "effort": "L",
+  "affectedRoutes": [
+   "refill",
+   "usedSale"
+  ]
+ },
+ {
+  "title": "Warn before mid-form navigation discards entered data (and photos)",
+  "category": "navigation",
+  "changeType": "change-pages",
+  "severity": "high",
+  "evidence": "The bottom tab nav renders on top of every form (markup L911-925) and the back chevrons (e.g. refill goServices L391) route immediately via setState with no guard. All form state is in-memory (state L3-28) with no persistence and no dirty-check.",
+  "userImpact": "A user part-way through the long refill/used form who taps any bottom tab or the back chevron loses everything with no warning — worst during the guest→auth OTP detour (submitRefill L262 routes to auth), where tapping a nav tab abandons the pending submission and all typed data plus attached photos. Silent, unrecoverable data loss.",
+  "recommendation": "Track a dirty flag per form; intercept in-app navigation (nav tabs, back) to show a confirm ('تغییرات ثبت‌نشده از بین می‌رود') and/or auto-persist a draft (localStorage) so returning restores the form. At minimum protect the guest→auth detour path.",
+  "effort": "M",
+  "affectedRoutes": [
+   "refill",
+   "usedSale",
+   "checkout",
+   "addresses",
+   "auth"
+  ]
+ },
+ {
+  "title": "Show consistent required-field indicators before submit",
+  "category": "forms",
+  "changeType": "change-state",
+  "severity": "medium",
+  "evidence": "Only refill photos carries a required marker: 'عکس کپسول (۱ تا ۳ تصویر — الزامی)' (markup L397) and used photos 'الزامی' (L480). Gas, delivery, phone (L413/L421/L452), used price/phone/desc (L496/L503/L508), address title/text (L885/L887), and auth phone have no required indicator, yet all are validated as required (script_2.js L256-259, L268-272, L293-294).",
+  "userImpact": "Users cannot tell which fields are mandatory until they fail submit. The inconsistency (photos marked, everything else not) implies the unmarked fields are optional, so users skip them and hit avoidable errors.",
+  "recommendation": "Adopt one convention (e.g. a red asterisk or 'الزامی' chip) on every required label, and mark truly optional fields '(اختیاری)' consistently as the notes/description fields already do.",
+  "effort": "S",
+  "affectedRoutes": [
+   "refill",
+   "usedSale",
+   "checkout",
+   "addresses",
+   "auth"
+  ]
+ },
+ {
+  "title": "Associate labels with inputs and announce errors to assistive tech",
+  "category": "accessibility",
+  "changeType": "other",
+  "severity": "medium",
+  "evidence": "Only 3 <label> elements exist (auth phone L329, address title L885, address text L887) and none use for/id. Every other field label is a styled <div> (e.g. refill 'شماره تماس' L452). Error containers are plain <div>s (e.g. L411, L454, L898) with no role=alert / aria-live / aria-describedby (grep-confirmed: none present).",
+  "userImpact": "Screen-reader users reach inputs with no programmatic label (announced as an unlabeled edit field), tapping a visible label does not focus its input, and validation errors are never announced — a blind or low-vision user submitting the form gets silence and no idea what failed.",
+  "recommendation": "Give each input an id and a real <label for>, wire error text via aria-describedby, add role=alert / aria-live=polite to error nodes, and set aria-invalid on failed fields. Fold this into the shared FormField component.",
+  "effort": "M",
+  "affectedRoutes": [
+   "auth",
+   "refill",
+   "usedSale",
+   "checkout",
+   "addresses"
+  ]
+ },
+ {
+  "title": "Harden phone inputs and actually validate the checkout phone",
+  "category": "forms",
+  "changeType": "change-state",
+  "severity": "medium",
+  "evidence": "Phone fields use text + inputmode=numeric, not type=tel, and no masking (auth L330, refill L453, used L504, checkout L568). validPhone (script_2.js L153) is only called in sendOtp/submitRefill/submitUsed; placeOrder (L308-318) never validates s.phone, and onPhone (L556) does no checking.",
+  "userImpact": "On desktop the numeric inputmode is only a hint, so letters can be typed into a 'phone' field. More importantly, a user can clear or corrupt the checkout phone and still place an order — the shop then has no valid callback number for a delivery that is coordinated entirely by phone ('هماهنگی تلفنی').",
+  "recommendation": "Use type=tel, apply live formatting to the placeholder pattern (0912 345 6789), reject non-digits, and run validPhone on the checkout phone in placeOrder (block + focus the field on failure).",
+  "effort": "M",
+  "affectedRoutes": [
+   "checkout",
+   "auth",
+   "refill",
+   "usedSale"
+  ]
+ },
+ {
+  "title": "Fix caret jump and digit-flipping while typing the used-sale price",
+  "category": "forms",
+  "changeType": "change-state",
+  "severity": "medium",
+  "evidence": "The price input binds value=\"{{ usPriceLabel }}\" to the fa-IR-formatted string (script_2.js L588) while onUsPrice fires per keystroke, deFa-normalizes, and re-derives the formatted value (L589). Because onChange is live in this runtime, the controlled value transforms length on every keypress.",
+  "userImpact": "As the user types the price, digits flip Latin→Persian and thousands separators insert live, and any edit in the middle of the number resets the caret to the end — making it very hard to correct a mistyped digit. Only the price field does this (phone/OTP/desc bind raw or truncate-only, so they are unaffected).",
+  "recommendation": "Either bind the raw value and format only on blur, or preserve caret position across the reformat (compute and restore selection offset), so mid-number edits stay put.",
+  "effort": "S",
+  "affectedRoutes": [
+   "usedSale"
+  ]
+ },
+ {
+  "title": "Let users remove an applied discount and give durable apply feedback",
+  "category": "forms",
+  "changeType": "change-state",
+  "severity": "medium",
+  "evidence": "applyDisc (script_2.js L528-532) sets disc + a 2.4s toast on EMDAD10 and an inline error otherwise. There is no handler to clear an applied disc except placeOrder; the apply button (markup L286) stays active and an empty code still routes to the error branch.",
+  "userImpact": "Once a code is applied the only confirmation is a toast that vanishes in 2.4s; a user who looks away sees only a changed total and may re-tap apply. They cannot remove a code they applied by mistake, and tapping apply with an empty field yields a confusing 'invalid code' error rather than a no-op.",
+  "recommendation": "Render an 'applied' chip with the code + a remove (✕) action and a persistent success state on the field; disable the apply button when the input is empty or a code is already applied.",
+  "effort": "S",
+  "affectedRoutes": [
+   "cart"
+  ]
+ },
+ {
+  "title": "Make the address map picker locate and validate a real position",
+  "category": "forms",
+  "changeType": "change-state",
+  "severity": "medium",
+  "evidence": "The picker (markup L893, manageMaps script L100-114) opens at a fixed Tehran-center default (adLat/adLng seed 35.7219,51.3347, state L13) with click/drag only. saveAddr (L290-306) validates only title and text length ≥10 — the pin is never validated and the typed text and map are fully disconnected.",
+  "userImpact": "Users must manually pan/drag from the city center to their exact location with no 'use my location' and no address search, which is slow and error-prone; and because the pin is not validated, an address can be saved with the default coordinate that has nothing to do with the typed address — so a phone-coordinated delivery may target the wrong point.",
+  "recommendation": "Add a geolocation ('موقعیت فعلی من') button and an address/geocode search; ideally reverse-geocode the pin into the text field (and vice-versa). At minimum require the pin to be moved from the default before saving.",
+  "effort": "L",
+  "affectedRoutes": [
+   "addresses",
+   "checkout",
+   "refill"
+  ]
+ },
+ {
+  "title": "Stop the fixed submit CTA from occluding form fields and the keyboard",
+  "category": "forms",
+  "changeType": "change-state",
+  "severity": "medium",
+  "evidence": "Every form pins its submit as position:fixed;bottom:80px (refill L463, used L518, checkout L592) above the fixed bottom nav. The ground-truth capture reports the refill CTA overlapping/covering the contact-phone field. Refill reserves 170px bottom padding (L389) vs a CTA topping out ~130px, so raw padding does not explain it — the trigger is the short/no-scroll configuration and the mobile keyboard.",
+  "userImpact": "On the refill form a field ends up hidden behind the floating CTA, so the user cannot see what they are typing; when the on-screen keyboard opens, a position:fixed CTA can also float over the focused input, compounding the problem across all form screens.",
+  "recommendation": "Prefer an inline CTA at the end of the scroll (or a sticky footer that participates in layout) rather than position:fixed; if kept fixed, guarantee scroll space ≥ CTA height + nav height + safe-area and handle the keyboard (hide/reposition the CTA on focus).",
+  "effort": "M",
+  "affectedRoutes": [
+   "refill",
+   "usedSale",
+   "checkout"
+  ]
+ },
+ {
+  "title": "Adopt a shared form UX standard (FormField + submit contract)",
+  "category": "architecture",
+  "changeType": "other",
+  "severity": "medium",
+  "evidence": "Each form re-implements label divs, error divs, and ad-hoc submit handlers with no common structure; there is no <form> element anywhere, OTP has no auto-submit at 6 digits (verifyOtp L216 requires a manual tap even though onOtp truncates to 6), and single-field steps cannot be submitted with the keyboard Go/Enter key.",
+  "userImpact": "Inconsistency compounds every issue above (validation timing, required markers, a11y, error focus differ per screen) and makes fixes N-times the work; users also lose small efficiencies like auto-submitting a 6-digit OTP or pressing Go to send.",
+  "recommendation": "Build one FormField (label+for, required marker, inline validate-on-blur with live-clear, aria-describedby error with role=alert, valid state) and one submit contract (disabled/pending, focus-first-error, draft retention). Wrap steps in <form onsubmit> for Enter/Go, and auto-submit OTP when 6 digits are entered.",
+  "effort": "L",
+  "affectedRoutes": [
+   "auth",
+   "refill",
+   "usedSale",
+   "checkout",
+   "addresses",
+   "cart"
+  ]
+ },
+ {
+  "title": "Persian search matching is brittle: no ZWNJ, space, or digit normalization",
+  "category": "rtl-i18n",
+  "changeType": "change-state",
+  "severity": "high",
+  "evidence": "script_2.js L330-332 — query filter only does s.q.replace(/ي/g,'ی').replace(/ك/g,'ک') then a raw .includes() over title+desc+gas. Product content uses ZWNJ/نیم‌فاصله ('اکسیژن‌ساز', 'یک‌بارمصرف', 'پلمب‌شده') and Persian digits ('۴۰ لیتری').",
+  "userImpact": "A Persian user searching 'اکسیژن ساز' (normal space) gets zero results because the product is stored as 'اکسیژن‌ساز' (ZWNJ); '40' fails to match '۴۰'; a device with an Arabic keyboard's alef-variants also misses. Users conclude the shop doesn't stock the item and abandon. This is the single highest-impact i18n defect — search silently fails for the most natural Persian queries.",
+  "recommendation": "Add a shared normalize() applied symmetrically to BOTH the query and the searchable text: fold ي→ی, ك→ک, ه/ة, collapse ZWNJ(U+200C) and all space variants to a single space (or strip them for matching), and run deFa() so Persian and ASCII digits are unified before includes(). Consider matching per-token instead of a single substring.",
+  "effort": "M"
+ },
+ {
+  "title": "Emergency hotline number is the same as the logged-in user's own phone",
+  "category": "trust-content",
+  "changeType": "other",
+  "severity": "high",
+  "evidence": "markup_only.html L383 shows the services '24/7 emergency order' card phone as 0912 845 7455; script_2.js L72 auto-login seeds the user with phone: '0912 845 7455' — byte-identical. That same number is echoed back in the profile header (userPhone, markup L650).",
+  "userImpact": "The app boots logged-in with this seeded profile, so a user reads the shop's 'سفارش فوری کپسول اکسیژن — شبانه‌روزی' hotline and sees literally their own number, which also appears in their profile. It reads as a copy/paste placeholder and directly undermines the emergency-availability trust message on a medical-oxygen product — the one place credibility matters most.",
+  "recommendation": "Use a distinct, real business hotline constant for the services card (and ideally a tel: link so it dials). Never reuse the demo user's seeded phone as store content; source both from separate config.",
+  "effort": "S"
+ },
+ {
+  "title": "Leftover prototype and English-leak copy is shipped in the Persian UI",
+  "category": "trust-content",
+  "changeType": "other",
+  "severity": "medium",
+  "evidence": "markup_only.html L343 'کد نمونه برای این پیش‌نمایش: 123456'; L179 mono label 'product photo · تصویر محصول' on the detail hero; L401/L484 'IMG' tiles; L681 footer 'نسخه پیش‌نمایش PWA'; script_2.js L486-487 toasts 'افزودن آدرس با MapPicker در نمونه بعدی' / 'انتخاب پین روی نقشه (Neshan) در نمونه بعدی'.",
+  "userImpact": "End users see the hardcoded OTP, English placeholder strings ('product photo', 'IMG'), 'preview/PWA' scaffolding, and 'in the next sample' TODO toasts. In a Persian medical-commerce context this scaffolding reads as unfinished/untrustworthy and mixes English into an otherwise all-Persian RTL surface.",
+  "recommendation": "Gate demo strings (OTP hint, 'نمونه بعدی' toasts, preview footer) behind a build/prototype flag; replace 'product photo'/'IMG' with real imagery or a localized alt caption; remove or Persian-localize 'PWA'. Do a copy pass to strip all dev-facing text before production.",
+  "effort": "M"
+ },
+ {
+  "title": "Grand-total label differs between cart and checkout; shipping row labels a method as a cost",
+  "category": "trust-content",
+  "changeType": "change-pages",
+  "severity": "medium",
+  "evidence": "Cart summary: 'مبلغ قابل پرداخت' (markup L298) and 'هزینه ارسال' whose value is 'هماهنگی تلفنی' (L296). Checkout summary: the same grand total is named 'مبلغ نهایی' (L589) and adds an 'اقلام سفارش' row (L583) the cart lacks.",
+  "userImpact": "Across two adjacent money screens the payable total is named two different things (مبلغ قابل پرداخت vs مبلغ نهایی), which erodes confidence at the most trust-sensitive step. 'هزینه ارسال' literally means shipping COST but shows a method ('هماهنگی تلفنی'), a label/value mismatch that can read as a hidden/unknown charge.",
+  "recommendation": "Standardize one term for the payable amount app-wide (e.g. 'مبلغ قابل پرداخت'). Relabel the shipping line to 'نحوه ارسال' (method) or 'هزینه ارسال: هنگام تحویل' so the value matches the label. Mirror the same summary rows on both cart and checkout.",
+  "effort": "S"
+ },
+ {
+  "title": "Page-title typeface is inconsistent across screens (Baloo h1 vs Vazirmatn div)",
+  "category": "visual",
+  "changeType": "change-pages",
+  "severity": "medium",
+  "evidence": "Top-tab screens use real headings → Baloo: products h1 L112, cart h1 L253, services h1 L359, profile h1 L621, detail title h1 L187. Back-chevron sub-pages render the title as a plain div → Vazirmatn: refill L394, usedSale L477, checkout L551, orders L691, requests L723, addresses L755, wishlist L807, auth L321 (all `<div style=\"font-weight:900;font-size:17px\">`). CSS applies Baloo only to h1,h2.",
+  "userImpact": "The same visual role (screen title) switches font family and apparent weight depending on which route you're on, so the header looks different as the user navigates — an inconsistent, less-polished brand feel that's especially visible in Persian where Baloo and Vazirmatn letterforms differ markedly.",
+  "recommendation": "Pick one title treatment. Either promote sub-page titles to h1/h2 (Baloo) or, given the Baloo weight problem below, standardize all titles on Vazirmatn with a defined weight/size token. Don't mix per route.",
+  "effort": "M"
+ },
+ {
+  "title": "Baloo Bhaijaan 2 has no usable weight axis — heading weight hierarchy collapses",
+  "category": "visual",
+  "changeType": "other",
+  "severity": "medium",
+  "evidence": "style_1.css declares 16 @font-face but resolves to only 4 unique woff2 URLs (grep-confirmed: each of c4acad6a…, 9e5423b7…, 4de9721d…, 39312691… reused 4×), one per subset shared across weights 500/600/700/800. CSS maps only h1,h2 to Baloo; markup sets font-weight:900 on hero h1 (L60) and 800 on section h2 (L84) — 900 isn't even declared for Baloo.",
+  "userImpact": "Every Baloo heading renders at one physical weight regardless of the 500–900 values in the markup, so intended emphasis (hero title vs section header) is flat. Worse, adjacent prices set to font-weight:900 render in Vazirmatn's real 900, so a Baloo 'heading' can look LIGHTER than the numbers beside it — an inverted hierarchy.",
+  "recommendation": "Ship a real Baloo variable font or the distinct static weights, or drop Baloo for headings and use Vazirmatn (which has 9 genuine weights) with an explicit type scale. Remove reliance on font-weight:900 for Baloo since it's undeclared.",
+  "effort": "M"
+ },
+ {
+  "title": "Negative letter-spacing and inconsistent line-heights degrade Persian heading typography",
+  "category": "visual",
+  "changeType": "other",
+  "severity": "low",
+  "evidence": "style_3.css h1,h2 rule: letter-spacing:-.4px; line-height:1.28. Inline overrides fight it: hero h1 line-height:1.5 (markup L60), detail h1 line-height:1.6 (L187), body container line-height:1.7 (L31).",
+  "userImpact": "Negative tracking on a cursive, connected script like Persian works against the font's built-in joining/kerning and can crowd or clip glyphs and diacritics; the tight 1.28 line-height risks clipping ascenders/hamza. Three different heading line-heights make vertical rhythm inconsistent between screens.",
+  "recommendation": "Remove letter-spacing for Arabic-script text (scope any tracking to Latin-only via :lang or a utility class), and standardize a single heading line-height (~1.4–1.5) rather than per-instance inline overrides.",
+  "effort": "S"
+ },
+ {
+  "title": "Medical/regulatory trust copy is absent for a medical-oxygen storefront",
+  "category": "trust-content",
+  "changeType": "other",
+  "severity": "medium",
+  "evidence": "Products are 'اکسیژن طبی' (medical oxygen) and pressure cylinders (script_2.js L31-54). Descriptions carry some trust signals ('تست هیدرواستاتیک معتبر', 'پر و پلمب', 'گارانتی') but there is no licensing/authorization (مجوز), prescription/eligibility note, safety-handling guidance, returns/refund policy, or purity-certificate wording anywhere; footer is only 'امداد اکسیژن تهران · نسخه پیش‌نمایش PWA' (L681).",
+  "userImpact": "For a regulated medical gas, buyers (and often regulators) expect authorization, safe-handling, and prescription/eligibility statements. Their absence lowers perceived legitimacy and may create compliance exposure for real deployment.",
+  "recommendation": "Add a trust layer: license/authorization line and logo, a short safety-handling note on cylinder detail pages, prescription/eligibility disclaimer for اکسیژن طبی, and a returns/warranty policy link. Localize all of it in the established formal register.",
+  "effort": "L"
+ },
+ {
+  "title": "User-entered and long Persian strings can overflow chips, rows, and the tab bar",
+  "category": "visual",
+  "changeType": "other",
+  "severity": "medium",
+  "evidence": "Address title input has no maxlength (markup L886) yet the address-card title row (L764-772) lays out title + 'پیش‌فرض' badge + 3-dot menu with a flex:1 spacer and no min-width:0/ellipsis on the title span. Status pills like 'در انتظار بررسی' (requestsList, L737) and bottom-nav labels 'محصولات'/'پروفایل' at font-size:10px in repeat(5,1fr) (L921) have no white-space:nowrap/overflow handling.",
+  "userImpact": "A long address title pushes the default badge and options menu off-screen or wraps awkwardly; the 'در انتظار بررسی' pill can wrap inside its rounded shape; nav labels can wrap/clip on sub-360px devices — all more likely in Persian where words don't break mid-token.",
+  "recommendation": "Cap adTitle length and add min-width:0 + overflow:hidden;text-overflow:ellipsis;white-space:nowrap to title spans; give status pills white-space:nowrap; allow nav labels to shrink or ellipsize. Test with the longest real labels.",
+  "effort": "M"
+ },
+ {
+  "title": "Inconsistent terminology and loanwords for staff and repeated concepts",
+  "category": "trust-content",
+  "changeType": "other",
+  "severity": "low",
+  "evidence": "Staff referred to four ways: 'کارشناسان' (script_2.js L193 inquire toast), 'همکاران ما' (success note L611), 'اپراتور' and 'تکنسین' (formSuccess refill note L601). Refill delivery heading 'نوع درخواست ارسال' (markup L421) is awkward vs the cleaner 'زمان و روش ارسال' used at checkout (L570). Wishlist empty-state says 'آیکن قلب' (L812), an English loanword.",
+  "userImpact": "Mixing کارشناس/همکار/اپراتور/تکنسین (and Persian vs transliterated loanwords) for the same people, plus varied labels for the same concept, weakens a consistent, trustworthy brand voice — noticeable to native readers.",
+  "recommendation": "Define a short microcopy glossary (one term for staff, one for delivery method, prefer Persian over اپراتور/تکنسین/آیکن) and apply it across toasts, success notes, and form headings.",
+  "effort": "S"
+ },
+ {
+  "title": "Discount amount is formatted as a positive number with a trailing minus in RTL",
+  "category": "rtl-i18n",
+  "changeType": "other",
+  "severity": "low",
+  "evidence": "discLabel = fmt(t.disc) is a positive Persian-digit number (script_2.js L525); templates render '{{ discLabel }}− تومان' (markup L294 cart, L586 checkout), placing the U+2212 minus after the digits and before تومان.",
+  "userImpact": "The sign sits ambiguously relative to the number in an RTL run ('۵۰۰٬۰۰۰− تومان'), which is non-standard and can read as either negative or a stray dash — sloppy for a money value.",
+  "recommendation": "Format the discount as a genuine negative via Intl.NumberFormat with signDisplay (or prepend the minus: '−۵۰۰٬۰۰۰ تومان') and wrap the numeric run in <bdi> so the sign stays attached correctly in RTL.",
+  "effort": "S"
+ },
+ {
+  "title": "Latin runs interpolated into Persian microcopy lack bidi isolation",
+  "category": "rtl-i18n",
+  "changeType": "change-state",
+  "severity": "low",
+  "evidence": "authErr string embeds an ASCII phone example inside Persian: 'شماره موبایل معتبر ایران وارد کنید (مثلاً 09123456789)' (script_2.js L211), rendered in a plain error div (markup L331) with no dir/<bdi>. The discount placeholder 'کد تخفیف (مثلاً EMDAD10)' (L285) similarly mixes a Latin token into an RTL field with no isolation.",
+  "userImpact": "Neutral characters (parentheses, the discount minus) around embedded Latin/numeric runs are direction-ambiguous in RTL and can render on the unexpected side across engines, giving inconsistent, non-localized number/punctuation formatting in the very messages meant to guide the user.",
+  "recommendation": "Best practice: wrap embedded Latin/number runs in <bdi> (or bracket with U+2066…U+2069 isolates), or use Persian example digits, so formatting is deterministic regardless of engine. Apply the same treatment wherever codes/phones sit inside Persian sentences.",
+  "effort": "S"
+ },
+ {
+  "title": "Form placeholders and error hints use inconsistent digit systems and helpfulness",
+  "category": "forms",
+  "changeType": "change-state",
+  "severity": "low",
+  "evidence": "Phone placeholders are ASCII '0912 345 6789' (markup L330/L453/L504) while the price placeholder is Persian 'مثلاً ۲٬۵۰۰٬۰۰۰' (L498). The auth phone error gives a format example (script_2.js L211) but the refill/used phone errors are bare 'شماره موبایل معتبر وارد کنید' (L259/L270); the submit-fail toast 'لطفاً موارد مشخص‌شده را تکمیل کنید' (L261/L275) names neither the field nor a count.",
+  "userImpact": "Mixed numerals across placeholders on the same form look unpolished, and the generic submit toast forces users to hunt for the offending field — made worse by the known fixed-CTA overlap that hides the phone field. Inconsistent error helpfulness means some fields explain the fix and others don't.",
+  "recommendation": "Pick one placeholder digit convention (Persian digits are fine even for dir=ltr phone fields since deFa already normalizes input), add the same format hint to every phone error, and make the toast specific (e.g. '۲ مورد نیاز به اصلاح دارد') and scroll to the first error.",
+  "effort": "M"
+ },
+ {
+  "title": "Fix the fixed-CTA overlapping the contact-phone field on the refill form",
+  "category": "forms",
+  "changeType": "other",
+  "severity": "high",
+  "evidence": "Refill route (markup_only.html): scroll area reserves only padding-bottom 170px (L389) while the primary CTA is position:fixed;bottom:80px (L463); the required 'شماره تماس' input sits at L453. Ground-truth driving the live app confirms the floating button covers this field.",
+  "userImpact": "On the refill service form the floating 'ثبت درخواست شارژ' button hides the required contact-phone field, so the user cannot see what they are typing into it — a direct path to failed/abandoned service requests.",
+  "recommendation": "Don't rely on a single cause: (a) raise the scroll padding-bottom to clear nav + CTA + env(safe-area-inset-bottom), AND (b) make the CTA sticky within the scroll flow or listen to window.visualViewport resize to hide/relocate the bar so a focused input is never occluded when the on-screen keyboard opens.",
+  "effort": "M",
+  "affectedRoutes": [
+   "refill"
+  ]
+ },
+ {
+  "title": "Offset every fixed CTA and the toast by the safe-area inset",
+  "category": "interaction",
+  "changeType": "other",
+  "severity": "high",
+  "evidence": "Six fixed action bars are hardcoded at bottom:80px (markup L235, L242, L306, L463, L518, L592) and the toast at bottom:88px (L906), but only the bottom nav adds env(safe-area-inset-bottom) (L912). Sheets also bottom-pad a flat 24px with no inset.",
+  "userImpact": "On notched / home-indicator phones the nav grows taller than the fixed 80px offset, so the primary CTAs and the toast collide with or tuck behind the nav (or sit under the home indicator), making the main action awkward to tap on exactly the devices the PWA targets.",
+  "recommendation": "Offset each fixed CTA/toast with calc(80px + env(safe-area-inset-bottom)) (or drive it from a measured nav-height CSS var), and add padding-bottom:env(safe-area-inset-bottom) inside the bottom sheets.",
+  "effort": "S",
+  "affectedRoutes": [
+   "detail",
+   "cart",
+   "checkout",
+   "refill",
+   "usedSale"
+  ]
+ },
+ {
+  "title": "Complete the bottom-sheet interaction: swipe-to-dismiss, max-height scroll, safe-area",
+  "category": "interaction",
+  "changeType": "change-state",
+  "severity": "high",
+  "evidence": "Filter sheet (markup L840-861) and address sheet (L864-903) render a 40x4 grabber pill (L844/L868) that implies drag, but dismissal is only scrim-tap (L841/L865) or a button — no touch/pointer drag handler exists (grep: none). Neither sheet sets a max-height or internal scroll; the address-FORM sheet stacks a 190px map (L893) + two inputs + the Save button (L899) with only 24px bottom padding.",
+  "userImpact": "The grabber is a false affordance — users swipe down to close and nothing happens. Worse, with no max-height/scroll, when the keyboard opens (or on a short viewport) the tall address-form sheet overflows and the 'ذخیره آدرس' Save button is pushed off-screen and unreachable, blocking address creation entirely.",
+  "recommendation": "Wire the grabber to a swipe/drag-down-to-dismiss gesture, cap the sheet at max-height:85dvh with overflow:auto on the body, pin the Save button in a sticky sheet footer, and add safe-area bottom padding.",
+  "effort": "M",
+  "affectedRoutes": [
+   "products",
+   "checkout",
+   "refill",
+   "addresses"
+  ]
+ },
+ {
+  "title": "Remove or make real the fake product carousel (dots imply swipe that does nothing)",
+  "category": "interaction",
+  "changeType": "change-state",
+  "severity": "medium",
+  "evidence": "Detail route (markup L178-185): a 220px crosshatch placeholder box plus three indicator dots — the first hardcoded active (background:var(--p)), two inactive — bound to no state, with no swipe handler and no image array. Ground-truth confirms there are no real images and no swipe.",
+  "userImpact": "The three dots signal a swipeable photo gallery, so users swipe the image and tap the dots expecting more views and get zero response — a broken affordance that also undermines trust for higher-consideration medical/industrial purchases.",
+  "recommendation": "Until real photos exist, drop the dot indicator so nothing implies a gallery. When images ship, build a swipeable track with state-bound, tappable dots (active index in state) and lazy-loaded images.",
+  "effort": "M",
+  "affectedRoutes": [
+   "detail"
+  ]
+ },
+ {
+  "title": "Enlarge sub-44px tap targets and add touch-action:manipulation to steppers/buttons",
+  "category": "interaction",
+  "changeType": "other",
+  "severity": "medium",
+  "evidence": "Cart qty steppers are 28x28 with a 4px gap inside a 3px-pad pill (markup L273-276); detail steppers 32x32 (L196-198); cart remove 32x32 (L278); the photo-tile remove ✕ is 22x22 offset -6px so it hangs partly off the tile (L402/L485); the address kebab is 32x32 (L770). No touch-action:manipulation is set anywhere (grep).",
+  "userImpact": "All sit below the ~44px comfortable thumb target; the tightly-spaced +/− invite mis-taps (decrementing/removing the wrong way), and the tiny off-edge ✕ is easy to miss. Rapid +/− tapping can also fire the browser's double-tap-to-zoom, jerking the view.",
+  "recommendation": "Raise interactive targets to >=44px (or add transparent hit-padding), widen the +/− spacing, move the tile ✕ fully onto the tile, and add touch-action:manipulation to steppers and small buttons to suppress double-tap zoom.",
+  "effort": "M",
+  "affectedRoutes": [
+   "cart",
+   "detail",
+   "refill",
+   "usedSale",
+   "addresses"
+  ]
+ },
+ {
+  "title": "Add an in-flight/disabled guard on submit CTAs to prevent latent double-submit",
+  "category": "state",
+  "changeType": "change-state",
+  "severity": "high",
+  "evidence": "placeOrder (script_2.js L308 / CTA markup L594), submitRefill (L253 / L465), submitUsed (L265 / L520) and sendOtp/verifyOtp (markup L332/L344) never set a disabled/in-flight flag; today only the synchronous route swap unmounts the button before a second tap can land.",
+  "userImpact": "The prototype only masks duplicates because submission is instantaneous. The moment these become real async network calls, a double-tap or a slow response will place duplicate orders, duplicate service requests, and duplicate OTP sends.",
+  "recommendation": "Introduce an isSubmitting flag: on tap, disable the CTA (its glow already drops via the existing [disabled] rule), show a spinner, ignore re-entrant calls, and re-enable on success/error.",
+  "effort": "M",
+  "affectedRoutes": [
+   "checkout",
+   "refill",
+   "usedSale",
+   "auth"
+  ]
+ },
+ {
+  "title": "Raise input font-size to >=16px and add tel autofill + OTP auto-submit",
+  "category": "forms",
+  "changeType": "other",
+  "severity": "high",
+  "evidence": "Inputs are under 16px throughout — products search 13px (markup L116), discount 13px (L285), auth phone 15px (L330), refill phone 14px (L453), checkout phone 14px (L568), used phone 14px (L504), plus 13px textareas. No input has an explicit type (grep) — phone fields rely on inputmode='numeric' only, with no autocomplete='tel'. The OTP field has autocomplete='one-time-code' but only submits on the button tap (verifyOtp, L344), not on completion.",
+  "userImpact": "iOS Safari auto-zooms whenever you focus an input under 16px, jerking the whole layout and reflowing the fixed bars on every field focus. Phone fields miss type='tel'/autocomplete='tel' autofill, and users must manually reach for 'تأیید' after typing the 6th OTP digit.",
+  "recommendation": "Set all inputs/textareas to font-size >=16px; give phone fields type='tel' + autocomplete='tel'; auto-submit the OTP once six digits are entered.",
+  "effort": "S",
+  "affectedRoutes": [
+   "products",
+   "cart",
+   "auth",
+   "refill",
+   "checkout",
+   "usedSale",
+   "addresses"
+  ]
+ },
+ {
+  "title": "Support native back: History API, edge-swipe, and a thumb-reachable back control",
+  "category": "navigation",
+  "changeType": "change-pages",
+  "severity": "high",
+  "evidence": "Every sub-page's only back affordance is a 40x40 chevron pinned to the top-start corner (e.g. detail L170, checkout L548, refill L391, orders L688). There is no history/popstate/pushState and no edge-swipe handler (grep); a route change is just window.scrollTo(0,0) (script_2.js L78).",
+  "userImpact": "On a large phone the top-corner back button is the hardest one-handed reach, and because routing never touches browser history, an OS/browser back gesture exits the app instead of going back a screen. Users must stretch to the top corner on every single sub-screen.",
+  "recommendation": "Drive routes through the History API (pushState + popstate) so the native back gesture and hardware Back navigate within the app, add an edge-swipe-back gesture, and/or mirror a back control into the thumb zone.",
+  "effort": "L",
+  "affectedRoutes": [
+   "detail",
+   "checkout",
+   "refill",
+   "usedSale",
+   "orders",
+   "requests",
+   "addresses",
+   "wishlist",
+   "auth"
+  ]
+ },
+ {
+  "title": "Restore list scroll position when returning from a detail page",
+  "category": "navigation",
+  "changeType": "change-pages",
+  "severity": "medium",
+  "evidence": "componentDidUpdate unconditionally resets scroll to top on any route change (script_2.js L76-78); there is no per-route scroll memory.",
+  "userImpact": "Scrolling deep into the products or orders list, opening an item, then tapping back dumps the user at the very top of the list every time — a classic mobile annoyance that makes browsing a long catalog tedious and disorienting.",
+  "recommendation": "Remember the scroll offset per route (at minimum for list->detail->back) and restore it on return; only scroll-to-top when navigating forward to a genuinely new page.",
+  "effort": "M",
+  "affectedRoutes": [
+   "products",
+   "detail",
+   "orders"
+  ]
+ },
+ {
+  "title": "Treat the animated aurora + per-card backdrop-blur as a scroll/typing perf risk",
+  "category": "performance",
+  "changeType": "other",
+  "severity": "medium",
+  "evidence": "Aurora blobs are position:fixed with will-change:transform animating infinitely (style_3.css L42-44); every --sur/--sur2 surface gets backdrop-filter:blur(16-18px) saturate(1.3) (L46-48); and the single monolithic Component re-renders and re-runs manageMaps() DOM work on every keystroke/state bump (script_2.js L76-80). No jank was measured — this is a mechanism-based risk.",
+  "userImpact": "On low/mid-range Android, scrolling long lists of frosted cards over the continuously-moving blurred background, and typing (each keystroke re-renders everything and re-runs map management), risks dropped frames and input lag.",
+  "recommendation": "Limit simultaneously-blurred surfaces (use a solid --sur fill on list cards), pause/park the aurora during active scroll, debounce the search filter, and gate manageMaps() so it only runs on map-bearing routes and on actual coordinate changes.",
+  "effort": "M",
+  "affectedRoutes": [
+   "products",
+   "refill",
+   "checkout",
+   "addresses"
+  ]
+ },
+ {
+  "title": "Set overscroll-behavior so an accidental pull-to-refresh can't wipe in-memory state",
+  "category": "interaction",
+  "changeType": "change-state",
+  "severity": "high",
+  "evidence": "No overscroll-behavior or touch-action is set anywhere (grep); the scroll root is the document body (wrapper min-height:100dvh, markup L31); and all state is purely in-memory with no persistence (reload loses cart, auth, and orders).",
+  "userImpact": "An accidental over-scroll past the top can trigger the browser/PWA pull-to-refresh, reloading the app and silently wiping the cart, login session, and order history in the middle of a checkout or service-request flow.",
+  "recommendation": "Add overscroll-behavior-y:contain to the scroll root (disabling pull-to-refresh), and persist cart/auth to storage so a reload is never destructive.",
+  "effort": "S",
+  "affectedRoutes": [
+   "products",
+   "cart",
+   "checkout",
+   "refill"
+  ]
+ },
+ {
+  "title": "Give card/row taps a pressed state and add haptic confirmation on key actions",
+  "category": "interaction",
+  "changeType": "change-state",
+  "severity": "medium",
+  "evidence": "The large tappables are plain <div onclick> — product cards (markup L89, L132), delivery-method options (L424), sort rows (L849), address-pick rows (L873) — so the global button:active{transform:translateY(1px)} (style_3.css L53) never applies to them, and there is no navigator.vibrate anywhere (grep).",
+  "userImpact": "Tapping a product card or option row produces no pressed-state and no tactile feedback, so during the instant-but-unanimated route swap the tap feels dead and users re-tap. Confirmations like add-to-cart, order-placed, and validation errors are also silent.",
+  "recommendation": "Use real <button>s (or add :active/:focus-visible pressed styling + role='button' + tabindex) for card/row taps, set a branded -webkit-tap-highlight-color, and fire a short navigator.vibrate() on add-to-cart, successful submit, and validation errors.",
+  "effort": "M",
+  "affectedRoutes": [
+   "products",
+   "services",
+   "refill",
+   "addresses",
+   "checkout"
+  ]
+ },
+ {
+  "title": "Scroll to and focus the first invalid field on failed form submit",
+  "category": "forms",
+  "changeType": "other",
+  "severity": "medium",
+  "evidence": "submitRefill/submitUsed set per-field errors but surface only a generic toast 'لطفاً موارد مشخص‌شده را تکمیل کنید' (script_2.js L261/L275); the submit CTA is bottom-fixed while the first required field (e.g. the photo uploader at the top of refill, markup L397) is far off-screen on these long forms.",
+  "userImpact": "After tapping the bottom-pinned submit, the user gets a vague toast but the actual invalid field is scrolled out of view with no indication where it is, leaving them hunting for what to fix.",
+  "recommendation": "On validation failure, scroll and focus the first errored field into view and have the toast name that first issue; validate on blur so errors surface before the user reaches the bottom.",
+  "effort": "M",
+  "affectedRoutes": [
+   "refill",
+   "usedSale"
+  ]
+ },
+ {
+  "title": "Make destructive removes reversible with an Undo action instead of silent auto-toasts",
+  "category": "state",
+  "changeType": "change-state",
+  "severity": "medium",
+  "evidence": "Cart item removal deletes immediately (script_2.js L392) as does address deletion (deleteAddr L280); toasts are pointer-events:none, auto-dismiss after 2.4s, and carry no action button (markup L906-908, script L160).",
+  "userImpact": "Combined with the small remove/✕ targets, one accidental tap permanently drops a cart line or a saved address with no recovery — especially costly for an address, which required placing a map pin to create.",
+  "recommendation": "Make destructive actions reversible: show an actionable snackbar with a 'بازگردانی' (Undo) button and a short grace delay before the delete commits.",
+  "effort": "M",
+  "affectedRoutes": [
+   "cart",
+   "addresses"
+  ]
+ }
+]
