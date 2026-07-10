@@ -82,6 +82,7 @@ class Component extends DCLogic {
 
 
   componentDidMount() {
+    this.showSplash();   // first: inject the launch overlay before the app paints (no flash behind it)
     document.documentElement.lang = 'fa';
     document.documentElement.dir = 'rtl';
     const hyd = this.hydrate();
@@ -192,6 +193,37 @@ class Component extends DCLogic {
     clearTimeout(this._toastT); clearInterval(this._cd); clearTimeout(this._mapRetry);
     if (this._picker) { this._picker.remove(); this._picker = null; }
     if (this._maps) { this._maps.forEach(m => m.remove()); this._maps = null; }
+    clearTimeout(this._splashT); clearTimeout(this._splashRmT);
+    if (this._splashEl) { this._splashEl.remove(); this._splashEl = null; }
+  }
+
+  // ---------- launch splash (once per tab session; runtime-injected overlay, pure CSS motion) ----------
+  // Shown before the app paints (called first in componentDidMount). Gated by a sessionStorage flag so
+  // it appears on a fresh tab open but not on in-app reloads; it never touches the durable localStorage
+  // slice. GSAP isn't registered at boot, so all motion lives in CSS (#eo-splash in style_3.work.css).
+  showSplash() {
+    try { if (sessionStorage.getItem('emdad:splash')) return; sessionStorage.setItem('emdad:splash', '1'); }
+    catch (e) { return; }   // sessionStorage can throw under file:///private mode — just skip the splash
+    const el = document.createElement('div');
+    el.id = 'eo-splash';
+    el.setAttribute('role', 'presentation');
+    el.setAttribute('aria-hidden', 'true');
+    el.innerHTML =
+      '<div class="eo-splash-stack">' +
+        '<div class="eo-splash-logo">O₂</div>' +
+        '<div class="eo-splash-word">امداد <span>اکسیژن</span></div>' +
+        '<div class="eo-splash-bar"><span></span></div>' +
+      '</div>';
+    document.body.appendChild(el);
+    this._splashEl = el;
+    const dismiss = () => {
+      if (!this._splashEl) return;
+      clearTimeout(this._splashT);
+      this._splashEl.classList.add('eo-splash-out');
+      this._splashRmT = setTimeout(() => { if (this._splashEl) { this._splashEl.remove(); this._splashEl = null; } }, 340);
+    };
+    el.addEventListener('pointerdown', dismiss, { once: true });   // tap to dismiss early
+    this._splashT = setTimeout(dismiss, 1200);
   }
 
   // ---------- persistence (localStorage; durable slice only) ----------

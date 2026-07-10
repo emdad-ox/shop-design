@@ -313,3 +313,56 @@ body[data-theme="dark"]{ --sur-solid:#221b3d; }
 [style*="border-radius:10px"],[style*="border-radius: 10px"],
 [style*="border-radius:9px"], [style*="border-radius: 9px"],
 [style*="border-radius:8px"], [style*="border-radius: 8px"]{ border-radius: 12px !important; }
+
+/* ============================================================================
+   Launch splash — runtime-injected #eo-splash overlay (see showSplash() in
+   script_2.work.js). Brand-gradient full screen, identical in light & dark
+   (it's the brand mark, not a theme surface). Pure CSS motion — GSAP isn't
+   registered at boot. Once per tab session; auto-dismisses after ~1.2s.
+   ============================================================================ */
+#eo-splash{
+  position: fixed; inset: 0; z-index: 9999;
+  display: grid; place-items: center;
+  background: var(--grad-brand); color: #fff;
+  opacity: 1; transition: opacity .32s var(--ease-standard);
+}
+#eo-splash.eo-splash-out{ opacity: 0; }
+.eo-splash-stack{ display: flex; flex-direction: column; align-items: center; gap: 16px; }
+.eo-splash-logo{
+  width: 72px; height: 72px; border-radius: 20px;
+  background: #fff; color: var(--p);
+  display: grid; place-items: center;
+  font-weight: 800; font-size: 26px; letter-spacing: .5px;
+  animation: eoSplashPop .5s var(--ease-spring) both;
+}
+.eo-splash-word{
+  font-weight: 800; font-size: 19px; color: #fff;
+  animation: eoSplashRise .5s var(--ease-standard) .08s both;
+}
+.eo-splash-word span{ color: #fff; opacity: .82; }   /* اکسیژن — soft two-tone on white */
+.eo-splash-bar{
+  width: 120px; height: 4px; border-radius: 999px; overflow: hidden;
+  background: rgba(255,255,255,.24);
+  animation: eoSplashRise .5s var(--ease-standard) .16s both;
+}
+.eo-splash-bar > span{
+  display: block; width: 40%; height: 100%; border-radius: 999px;
+  background: #fff;
+  animation: eoSplashSweep 1.05s var(--ease-standard) infinite;
+}
+@keyframes eoSplashPop{
+  from{ opacity: 0; transform: scale(.72); }
+  to{ opacity: 1; transform: scale(1); }
+}
+@keyframes eoSplashRise{
+  from{ opacity: 0; transform: translateY(8px); }
+  to{ opacity: 1; transform: translateY(0); }
+}
+@keyframes eoSplashSweep{
+  0%{ transform: translateX(-120%); }
+  100%{ transform: translateX(370%); }
+}
+@media (prefers-reduced-motion: reduce){
+  .eo-splash-logo, .eo-splash-word, .eo-splash-bar{ animation: none; }
+  .eo-splash-bar > span{ animation: none; width: 100%; }
+}
