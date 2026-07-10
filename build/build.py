@@ -57,3 +57,8 @@ if os.path.exists(gsap_path):
 
 open(OUT, "w", encoding="utf-8").write(html2)
 print("BUILD OK ->", OUT, "| bytes:", len(html2))
+
+# Also emit index.html at the repo root so GitHub Pages serves the app at the site root.
+idx = os.path.join(ROOT, "index.html")
+open(idx, "w", encoding="utf-8").write(html2)
+print("BUILD OK (GitHub Pages) ->", idx)
