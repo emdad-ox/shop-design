@@ -1214,7 +1214,7 @@ class Component extends DCLogic {
     const price = parseInt(this.deFa(s.usPrice) || '0', 10);
     // Support FAB: lift it above the full-width fixed bottom CTA on screens that have one, so the
     // two never overlap; otherwise it rests just above the bottom nav.
-    const hasBottomCta = (route === 'cart' && t.count > 0) || route === 'checkout' || (route === 'detail' && (curVm.canAdd || curVm.out)) || route === 'refill' || route === 'usedSale';
+    const hasBottomCta = (route === 'cart' && t.count > 0) || route === 'checkout' || (route === 'detail' && (curVm.canAdd || curVm.out)) || route === 'refill' || route === 'usedSale' || route === 'services';
     const fabStyle = 'position:fixed;z-index:40;inset-inline-end:16px;bottom:calc(' + (hasBottomCta ? '150px' : '86px') + ' + env(safe-area-inset-bottom));width:54px;height:54px;border-radius:999px;background:var(--grad-cta);color:#fff;display:grid;place-items:center;box-shadow:0 12px 26px -6px var(--glow);text-decoration:none';
 
     return {
