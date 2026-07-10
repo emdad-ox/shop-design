@@ -564,9 +564,13 @@ class Component extends DCLogic {
     if (!to || to === from) { this.setState(patch); return; }
     const dd = (this.DEPTH[to] || 0) - (this.DEPTH[from] || 0);
     let dir;
-    if (dd > 0) dir = 'forward';
-    else if (dd < 0) dir = 'back';
-    else dir = (this.TAB_ORDER.indexOf(this.tabOf(to)) >= this.TAB_ORDER.indexOf(this.tabOf(from))) ? 'forward' : 'back';
+    if ((this.DEPTH[to] || 0) === 0) {
+      // Main pages (bottom-nav tabs): swipe left/right by tab order — even when arriving from a sub-page.
+      dir = (this.TAB_ORDER.indexOf(this.tabOf(to)) >= this.TAB_ORDER.indexOf(this.tabOf(from))) ? 'forward' : 'back';
+    } else {
+      // Sub-pages: always swap IN FROM THE RIGHT on drill-in; reverse (parent from left) on the way back.
+      dir = (dd >= 0) ? 'back' : 'forward';
+    }
     this.nav(patch, dir);
   }
   // "Smart" state transition: animate a non-route state change (filter/sort) as a list FLIP.
