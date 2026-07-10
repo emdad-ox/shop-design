@@ -385,7 +385,7 @@ class Component extends DCLogic {
   pinIcon() {
     return window.L.divIcon({
       className: '', iconSize: [30, 38], iconAnchor: [15, 36],
-      html: '<svg width="30" height="38" viewBox="0 0 30 38" xmlns="http://www.w3.org/2000/svg"><path d="M15 1C7.8 1 2 6.8 2 14c0 8.5 11 21.5 12 22.6.5.5 1.5.5 2 0C17 35.5 28 22.5 28 14 28 6.8 22.2 1 15 1z" fill="#0b8a78" stroke="#fff" stroke-width="2"/><circle cx="15" cy="14" r="5" fill="#fff"/></svg>'
+      html: '<svg width="30" height="38" viewBox="0 0 30 38" xmlns="http://www.w3.org/2000/svg"><path d="M15 1C7.8 1 2 6.8 2 14c0 8.5 11 21.5 12 22.6.5.5 1.5.5 2 0C17 35.5 28 22.5 28 14 28 6.8 22.2 1 15 1z" fill="#6250a8" stroke="#fff" stroke-width="2"/><circle cx="15" cy="14" r="5" fill="#fff"/></svg>'
     });
   }
 
@@ -824,7 +824,7 @@ class Component extends DCLogic {
     const cx = s.left + s.width / 2, cy = s.top + s.height / 2;
     const SZ = 46;
     const fly = document.createElement('div');
-    fly.style.cssText = 'position:fixed;z-index:9999;pointer-events:none;left:' + (cx - SZ / 2) + 'px;top:' + (cy - SZ / 2) + 'px;width:' + SZ + 'px;height:' + SZ + 'px;border-radius:999px;background:linear-gradient(180deg,var(--p),var(--p-deep));box-shadow:0 12px 26px -6px var(--glow);display:grid;place-items:center;color:#fff;will-change:transform,opacity';
+    fly.style.cssText = 'position:fixed;z-index:9999;pointer-events:none;left:' + (cx - SZ / 2) + 'px;top:' + (cy - SZ / 2) + 'px;width:' + SZ + 'px;height:' + SZ + 'px;border-radius:999px;background:var(--grad-cta);box-shadow:0 12px 26px -6px var(--glow);display:grid;place-items:center;color:#fff;will-change:transform,opacity';
     fly.innerHTML = '<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>';
     document.body.appendChild(fly);
     const dx = (tr.left + tr.width / 2) - cx, dy = (tr.top + tr.height / 2) - cy;
@@ -853,7 +853,7 @@ class Component extends DCLogic {
   vm(p) {
     const show = this.showPrice(p);
     return {
-      id: p.id, title: p.title,
+      id: p.id, title: p.title, isNew: !!p.new,
       meta: p.gas + ' · ' + this.catLabel(p.cat),
       hasPrice: show, inquiry: !show,
       priceLabel: show ? this.fmt(p.price) : '',
@@ -1215,7 +1215,7 @@ class Component extends DCLogic {
     // Support FAB: lift it above the full-width fixed bottom CTA on screens that have one, so the
     // two never overlap; otherwise it rests just above the bottom nav.
     const hasBottomCta = (route === 'cart' && t.count > 0) || route === 'checkout' || (route === 'detail' && (curVm.canAdd || curVm.out)) || route === 'refill' || route === 'usedSale';
-    const fabStyle = 'position:fixed;z-index:40;inset-inline-end:16px;bottom:calc(' + (hasBottomCta ? '150px' : '86px') + ' + env(safe-area-inset-bottom));width:54px;height:54px;border-radius:999px;background:linear-gradient(180deg,var(--p),var(--p-deep));color:#fff;display:grid;place-items:center;box-shadow:0 12px 26px -6px var(--glow);text-decoration:none';
+    const fabStyle = 'position:fixed;z-index:40;inset-inline-end:16px;bottom:calc(' + (hasBottomCta ? '150px' : '86px') + ' + env(safe-area-inset-bottom));width:54px;height:54px;border-radius:999px;background:var(--grad-cta);color:#fff;display:grid;place-items:center;box-shadow:0 12px 26px -6px var(--glow);text-decoration:none';
 
     return {
       isHome: route === 'home', isProducts: route === 'products', isDetail: route === 'detail',

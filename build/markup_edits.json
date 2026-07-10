@@ -6,6 +6,48 @@
     "replace": "<div tabindex=\"0\" role=\"button\" data-pid=\"{{ item.id }}\" onclick=\"{{ item.open }}\""
   },
   {
+    "what": "WARM empty-cart glyph disc → coral tint (cold empty state becomes inviting)",
+    "count": 1,
+    "find": "width:72px;height:72px;border-radius:999px;background:var(--sur2);display:grid;place-items:center;margin:0 auto 16px",
+    "replace": "width:72px;height:72px;border-radius:999px;background:var(--warm-soft);color:var(--warm-ink);display:grid;place-items:center;margin:0 auto 16px"
+  },
+  {
+    "what": "LOGO tile → purple→cyan brand gradient (was teal)",
+    "count": 1,
+    "find": "linear-gradient(140deg,#0b8a78,#16c9a6)",
+    "replace": "var(--grad-brand)"
+  },
+  {
+    "what": "LOGO wordmark → two-tone with cyan accent on اکسیژن (echoes site logotype)",
+    "count": 1,
+    "find": "<div style=\"font-weight:800;font-size:16px\">امداد اکسیژن</div>",
+    "replace": "<div style=\"font-weight:800;font-size:16px\">امداد <span style=\"color:var(--acc)\">اکسیژن</span></div>"
+  },
+  {
+    "what": "HERO banner (مرکز تخصصی اکسیژن) → purple brand gradient (was teal)",
+    "count": 1,
+    "find": "linear-gradient(140deg,#065f57 0%,#0b8a78 46%,#16c9a6 100%)",
+    "replace": "radial-gradient(circle at 86% 92%, color-mix(in oklab, var(--warm) 62%, transparent), transparent 56%), var(--grad-brand)"
+  },
+  {
+    "what": "HERO eyebrow dot glow → cyan-white (was mint)",
+    "count": 1,
+    "find": "background:#eafff9;box-shadow:0 0 8px #baffe9",
+    "replace": "background:#eafcff;box-shadow:0 0 8px #a9ecff"
+  },
+  {
+    "what": "HERO CTA label → purple (was teal)",
+    "count": 1,
+    "find": "background:#fff;color:#086b5d;font-weight:800;font-size:14px",
+    "replace": "background:#fff;color:var(--p);font-weight:800;font-size:14px"
+  },
+  {
+    "what": "WARM coral جدید badge on new product cards (both card variants) — differentiates from cyan inquiry tag",
+    "count": 2,
+    "find": "<div style=\"font-weight:700;font-size:13.5px\">{{ item.title }}</div>",
+    "replace": "<div style=\"display:flex;align-items:center;gap:6px;flex-wrap:wrap\"><sc-if value=\"{{ item.isNew }}\" hint-placeholder-val=\"{{ false }}\"><span style=\"font-size:11px;font-weight:600;color:var(--warm-ink);background:var(--warm-soft);border:1px solid color-mix(in oklab, var(--warm) 26%, transparent);padding:2px 8px;border-radius:999px;white-space:nowrap\">جدید</span></sc-if><div style=\"font-weight:700;font-size:13.5px\">{{ item.title }}</div></div>"
+  },
+  {
     "what": "WI-09 wishlist label beside heart on NEW products",
     "count": 1,
     "find": "aria-label=\"علاقه‌مندی\" style=\"{{ wishBtnStyle }}\">",

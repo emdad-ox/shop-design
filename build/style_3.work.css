@@ -6,16 +6,24 @@ html,body{margin:0;padding:0}
 body[data-theme="dark"] .leaflet-tile{filter:brightness(.7) invert(1) contrast(.92) hue-rotate(180deg) saturate(.75)}
 .leaflet-container{border-radius:inherit}
 body{
-  /* ===== Clinical-calm — cool near-neutral ground, teal SPENT as accent (light) ===== */
-  --bg:#eef2f1; --bg2:#e7edec;
-  --sur:rgba(255,255,255,.72); --sur2:rgba(214,236,231,.5); --tx:#08302b; --tx2:#3d5c57; --line:rgba(8,48,43,.10);
-  --p:#087a6a; --p-deep:#065f57; --onp:#ffffff;
-  --acc:#12b39a;
-  --acc-soft:color-mix(in oklab, var(--acc) 16%, #ffffff);
-  --acc-ink:color-mix(in oklab, var(--acc) 66%, var(--tx));
+  /* ===== Emdad brand — PURPLE primary, TEAL-CYAN secondary (matches امداد اکسیژن تهران site) — light ===== */
+  --bg:#f1eff7; --bg2:#e9e5f2;
+  --sur:rgba(255,255,255,.74); --sur2:rgba(233,229,246,.55); --tx:#241c40; --tx2:#5c5478; --line:rgba(36,28,64,.10);
+  --p:#6250a8; --p-deep:#4c3d86; --onp:#ffffff;
+  --acc:#1aa8bd;   /* SECONDARY = teal-cyan (the site's accent/logo/CTA hue) */
+  --s:var(--acc); --s-soft:var(--acc-soft); --s-ink:var(--acc-ink);   /* semantic alias for the secondary */
+  --acc-soft:color-mix(in oklab, var(--acc) 15%, #ffffff);
+  --acc-ink:color-mix(in oklab, var(--acc) 72%, var(--tx));
+  --warm:#ef6d4c;   /* WARM accent = coral — temperature contrast against the cool purple+cyan; between err-red & warn-amber */
+  --warm-soft:color-mix(in oklab, var(--warm) 15%, #ffffff);
+  --warm-ink:color-mix(in oklab, var(--warm) 68%, var(--tx));
   --p-soft:color-mix(in oklab, var(--p) 12%, #ffffff);
   --glow:color-mix(in oklab, var(--p) 55%, transparent);
-  --ok:#1c9e56; --ok-soft:#dbf4e9; --err:#e04a56; --err-soft:#fce9ea; --warn:#bd7d0d; --warn-soft:#faf0d8;
+  /* SYNCED brand gradients — one source, one 140° angle, purple→cyan DNA (defined once; the
+     var() refs resolve per-theme). --grad-brand = large surfaces (hero/logo); --grad-cta = buttons. */
+  --grad-brand:linear-gradient(140deg, var(--p-deep) 0%, var(--p) 50%, var(--acc) 128%);
+  --grad-cta:linear-gradient(140deg, var(--p) 0%, color-mix(in oklab, var(--p-deep) 76%, var(--acc)) 100%);
+  --ok:#1c9e56; --ok-soft:#dbf4e9; --err:#d11a3a; --err-soft:#fbe3e8; --warn:#bd7d0d; --warn-soft:#faf0d8;   /* --err → truer crimson so it never reads like the coral secondary */
   --blur:16px;
   /* elevation ramp — cool-neutral ink (not teal); colored glow reserved for hero (--e4) */
   --edge:inset 0 1px 0 rgba(255,255,255,.55);
@@ -25,21 +33,25 @@ body{
   --e3:0 2px 6px -2px rgba(8,30,30,.14), 0 20px 44px -18px rgba(8,30,30,.26);
   --e4:0 24px 54px -22px var(--glow), var(--edge);
   --shadow:var(--e2);
-  --aur1:radial-gradient(circle, rgba(8,122,106,.42), transparent 62%);
-  --aur2:radial-gradient(circle, rgba(16,120,120,.40), transparent 62%);
+  --aur1:radial-gradient(circle, rgba(98,80,168,.50), transparent 62%);
+  --aur2:radial-gradient(circle, rgba(26,168,189,.46), color-mix(in oklab, var(--warm) 24%, transparent) 46%, transparent 64%);
   background:var(--bg);
 }
 body[data-theme="dark"]{
-  /* ===== Clinical-calm — deep cool ground (dark) ===== */
-  --bg:#07171b; --bg2:#08202a;
-  --sur:rgba(22,44,48,.55); --sur2:rgba(16,32,35,.5); --tx:#eafcf7; --tx2:#9fbab5; --line:rgba(255,255,255,.10);
-  --p:#12a897; --p-deep:#0c7f92; --onp:#04201c;
-  --acc:#4df0d0;
-  --acc-soft:color-mix(in oklab, var(--acc) 20%, #0a2a2c);
-  --acc-ink:color-mix(in oklab, var(--acc) 74%, #eafcf7);
-  --p-soft:color-mix(in oklab, var(--p) 22%, #08262a);
+  /* ===== Emdad brand — PURPLE primary, TEAL-CYAN secondary — dark ===== */
+  --bg:#151026; --bg2:#1c1638;
+  --sur:rgba(42,34,68,.55); --sur2:rgba(28,22,52,.5); --tx:#efeafc; --tx2:#b0a8cf; --line:rgba(255,255,255,.10);
+  --p:#8f7cdd; --p-deep:#6b58be; --onp:#16112c;
+  --acc:#41d0e2;   /* SECONDARY = teal-cyan (dark) */
+  --s:var(--acc); --s-soft:var(--acc-soft); --s-ink:var(--acc-ink);
+  --acc-soft:color-mix(in oklab, var(--acc) 22%, #171233);
+  --acc-ink:color-mix(in oklab, var(--acc) 80%, #efeafc);
+  --warm:#ff8c63;   /* WARM accent = coral (dark) */
+  --warm-soft:color-mix(in oklab, var(--warm) 22%, #171233);
+  --warm-ink:color-mix(in oklab, var(--warm) 80%, #efeafc);
+  --p-soft:color-mix(in oklab, var(--p) 24%, #171233);
   --glow:color-mix(in oklab, var(--p) 60%, transparent);
-  --ok:#2ecf88; --ok-soft:#103029; --err:#f0687a; --err-soft:#3e2028; --warn:#e3a63a; --warn-soft:#3a2e14;
+  --ok:#2ecf88; --ok-soft:#103029; --err:#ff5a74; --err-soft:#3e2028; --warn:#e3a63a; --warn-soft:#3a2e14;   /* --err → crimson-rose, distinct from coral secondary */
   --blur:18px;
   --edge:inset 0 1px 0 rgba(255,255,255,.06);
   --e0:inset 0 1px 2px rgba(0,0,0,.5);
@@ -48,8 +60,8 @@ body[data-theme="dark"]{
   --e3:0 2px 6px -2px rgba(0,0,0,.55), 0 22px 48px -18px rgba(0,0,0,.72);
   --e4:0 24px 54px -22px var(--glow), var(--edge);
   --shadow:var(--e2);
-  --aur1:radial-gradient(circle, rgba(18,180,150,.40), transparent 60%);
-  --aur2:radial-gradient(circle, rgba(16,120,120,.36), transparent 60%);
+  --aur1:radial-gradient(circle, rgba(120,96,210,.48), transparent 60%);
+  --aur2:radial-gradient(circle, rgba(50,190,210,.42), color-mix(in oklab, var(--warm) 28%, transparent) 46%, transparent 62%);
 }
 body{position:relative;background:linear-gradient(160deg,var(--bg),var(--bg2))}
 body::before,body::after{content:"";position:fixed;z-index:0;border-radius:999px;pointer-events:none;filter:blur(44px);will-change:transform}
@@ -175,7 +187,7 @@ button:focus-visible,[role="button"]:focus-visible,[tabindex]:focus-visible{ out
 input:focus,textarea:focus{ border-color: var(--p) !important; box-shadow: 0 0 0 3px var(--p-soft); }
 
 /* Primary CTAs: subtle vertical depth gradient (premium; darkens toward --p-deep at the base) */
-button[style*="background:var(--p)"],button[style*="background: var(--p)"]{ background: linear-gradient(180deg, var(--p), var(--p-deep)) !important; }
+button[style*="background:var(--p)"],button[style*="background: var(--p)"]{ background: var(--grad-cta) !important; }
 
 /* Guard in-memory state against an accidental pull-to-refresh / overscroll */
 html,body{ overscroll-behavior-y: contain; }
@@ -288,8 +300,8 @@ button[style*="height:34px"][style*="border-radius:999px"]{
 /* WI-07 — product cards go MATTE so the price reads crisply over the aurora (light-first).
    [data-pid] is on all 4 card variants; drop the backdrop blur and use an opaque surface.
    Elevation/border stay (the --sur box-shadow hook still matches the inline style). */
-body{ --sur-solid:#f6faf9; }
-body[data-theme="dark"]{ --sur-solid:#122a2f; }
+body{ --sur-solid:#f8f6fc; }
+body[data-theme="dark"]{ --sur-solid:#221b3d; }
 [data-pid]{
   background: var(--sur-solid) !important;
   -webkit-backdrop-filter: none !important; backdrop-filter: none !important;
