@@ -1215,7 +1215,9 @@ class Component extends DCLogic {
     // Support FAB: lift it above the full-width fixed bottom CTA on screens that have one, so the
     // two never overlap; otherwise it rests just above the bottom nav.
     const hasBottomCta = (route === 'cart' && t.count > 0) || route === 'checkout' || (route === 'detail' && (curVm.canAdd || curVm.out)) || route === 'refill' || route === 'usedSale' || route === 'services';
-    const fabStyle = 'position:fixed;z-index:40;inset-inline-end:16px;bottom:calc(' + (hasBottomCta ? '150px' : '86px') + ' + env(safe-area-inset-bottom));width:54px;height:54px;border-radius:999px;background:var(--grad-cta);color:#fff;display:grid;place-items:center;box-shadow:0 12px 26px -6px var(--glow);text-decoration:none';
+    // Support pill shows only on the three browse pages (no bottom CTA to compete with); hidden elsewhere.
+    const showFab = route === 'home' || route === 'products' || route === 'profile';
+    const fabStyle = 'position:fixed;z-index:40;inset-inline-end:16px;bottom:calc(' + (hasBottomCta ? '150px' : '86px') + ' + env(safe-area-inset-bottom));height:46px;padding:0 15px;border-radius:999px;background:var(--grad-cta);color:#fff;display:inline-flex;align-items:center;gap:8px;box-shadow:0 12px 26px -6px var(--glow);text-decoration:none;font-size:12px;font-weight:600;white-space:nowrap' + (showFab ? '' : ';display:none');
 
     return {
       isHome: route === 'home', isProducts: route === 'products', isDetail: route === 'detail',
