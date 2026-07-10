@@ -215,7 +215,6 @@ button,[role="button"],a{ -webkit-tap-highlight-color: transparent; }
 [style*="z-index:30"][style*="pointer-events:none"],
 [style*="z-index: 30"][style*="pointer-events: none"]{
   padding-top: 44px;   /* WI-05: taller seam so content clearly fades under the floating CTA */
-  background: linear-gradient(to top, var(--bg) 68%, transparent);
 }
 /* WI-05: give the floating CTA button itself a clear lift so it reads as detached/floating */
 [style*="z-index:30"][style*="pointer-events:none"] > button,
