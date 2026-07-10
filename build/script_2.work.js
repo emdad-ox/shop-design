@@ -112,6 +112,7 @@ class Component extends DCLogic {
     this.managePhotoTiles();
     this.manageHeart();
     this.manageHeroCarousel();
+    this.manageHomeHero();
     this.manageSheetDrag();
     this.manageSuccessFx();
     this.manageAuthFx();
@@ -178,6 +179,7 @@ class Component extends DCLogic {
     this.managePhotoTiles();
     this.manageHeart();
     this.manageHeroCarousel();
+    this.manageHomeHero();
     this.manageSheetDrag();
     this.manageSuccessFx();
     this.manageAuthFx();
@@ -313,6 +315,52 @@ class Component extends DCLogic {
         onThrowUpdate() { setDots(Math.round(-this.x / width())); },
         onDragEnd() { setDots(Math.round(-this.x / width())); },
         onThrowComplete() { setDots(Math.round(-this.x / width())); },
+      })[0];
+    }
+  }
+
+  // Home hero slideshow: a 2-slide auto-playing carousel (brand banner + promo image → services)
+  // on the same swipe rig as the detail hero (GSAP Draggable + dots) plus a 5s auto-advance timer.
+  // Auto-advance pauses on touch and is disabled under reduced motion; fully torn down off-home.
+  manageHomeHero() {
+    const track = document.querySelector('[data-home-hero-track]');
+    if (this.state.route !== 'home' || !track) {
+      if (this._homeHeroTimer) { clearInterval(this._homeHeroTimer); this._homeHeroTimer = null; }
+      if (this._homeHeroDrag) { this._homeHeroDrag.kill(); this._homeHeroDrag = null; }
+      this._homeHeroTrackEl = null;
+      return;
+    }
+    if (this._homeHeroTrackEl === track) return;   // already wired for this mount
+    if (this._homeHeroDrag) { this._homeHeroDrag.kill(); this._homeHeroDrag = null; }   // fresh element → tear down old rig first
+    if (this._homeHeroTimer) { clearInterval(this._homeHeroTimer); this._homeHeroTimer = null; }
+    this._homeHeroTrackEl = track;
+    const g = window.gsap, self = this, viewport = track.parentElement, N = track.children.length;
+    const width = () => viewport.getBoundingClientRect().width || 320;
+    const dots = [...document.querySelectorAll('[data-home-hero-dots] [data-dot]')];
+    const wrap = (i) => ((i % N) + N) % N;
+    let cur = 0;
+    const setDots = (i) => dots.forEach((d, k) => { const a = k === i; d.style.width = a ? '16px' : '6px'; d.style.background = a ? 'var(--p)' : 'var(--line)'; });
+    const goTo = (i, animate) => {
+      cur = wrap(i); const x = -cur * width();
+      if (g && !self.reduceMotion() && animate !== false) g.to(track, { x: x, duration: 0.45, ease: 'power3.out', overwrite: 'auto' });
+      else if (g) g.set(track, { x: x }); else track.style.transform = 'translateX(' + x + 'px)';
+      setDots(cur);
+    };
+    const stopAuto = () => { if (self._homeHeroTimer) { clearInterval(self._homeHeroTimer); self._homeHeroTimer = null; } };
+    const startAuto = () => { stopAuto(); if (self.reduceMotion() || N < 2) return; self._homeHeroTimer = setInterval(() => goTo(cur + 1, true), 5000); };
+    dots.forEach((d, i) => { d.onclick = () => { goTo(i, true); startAuto(); }; });
+    goTo(0, false);
+    startAuto();
+    if (this._gsapReady && window.Draggable) {
+      this._homeHeroDrag = window.Draggable.create(track, {
+        type: 'x', inertia: !!window.InertiaPlugin, dragClickables: true, cursor: 'grab', activeCursor: 'grabbing',
+        bounds: { minX: -(N - 1) * width(), maxX: 0 },
+        snap: { x: (v) => Math.round(v / width()) * width() },
+        onPress() { stopAuto(); },
+        onDrag() { setDots(wrap(Math.round(-this.x / width()))); },
+        onDragEnd() { cur = wrap(Math.round(-this.x / width())); setDots(cur); startAuto(); },
+        onThrowUpdate() { setDots(wrap(Math.round(-this.x / width()))); },
+        onThrowComplete() { cur = wrap(Math.round(-this.x / width())); setDots(cur); startAuto(); },
       })[0];
     }
   }
