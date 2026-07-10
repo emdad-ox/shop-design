@@ -48,9 +48,10 @@ Goal: show a short, branded splash on launch.
 ### `build/style_3.work.css`
 - `#eo-splash`: `position:fixed; inset:0; z-index:<above app, below nothing needed>;`
   `background: var(--grad-brand); display:grid; place-items:center;` white text.
-- Centered stack: logo tile (rounded square, ~72px, white bg, `--p` colored "O₂" OR white
-  tile per final visual — see note), wordmark, slim progress track (~120px × 4px) with an
-  indeterminate sweeping fill.
+- Centered stack: logo tile (rounded square, ~72px, **white background with `--p`
+  purple "O₂"** — a white tile reads with contrast against the gradient background, unlike
+  the header's gradient-on-surface tile), white wordmark below, slim progress track
+  (~120px × 4px, translucent white) with an indeterminate sweeping white fill.
 - Keyframes: `eo-splash-pop` (logo scale/fade in), `eo-splash-bar` (indeterminate sweep).
 - `.eo-splash-out { opacity:0; transition: opacity .3s; }`.
 - `@media (prefers-reduced-motion: reduce)`: no pop/sweep; static hold then plain fade;
