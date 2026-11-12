@@ -55,6 +55,20 @@ if os.path.exists(gsap_path):
     else:
         print("  WARN: GSAP not injected (already present or no </head>)")
 
+# ---- Bundle React 18.3.1 UMD (offline): the dc-runtime's loadReactUmd() short-circuits when
+# window.React && window.ReactDOM already exist, so inlining them before </head> removes the
+# boot-time unpkg.com fetch — without this the "offline" artifact shows a blank page with no network.
+react_dir = f"{SCRATCH}/react_bundle"
+react_files = ["react.production.min.js", "react-dom.production.min.js"]
+if all(os.path.exists(f"{react_dir}/{f}") for f in react_files):
+    react_src = "\n".join(open(f"{react_dir}/{f}", encoding="utf-8").read() for f in react_files)
+    assert "</script" not in react_src.lower(), "React bundle contains </script — cannot inline safely"
+    if "__eo_react" not in html2 and "</head>" in html2:
+        html2 = html2.replace("</head>", '<script id="__eo_react">/* React 18.3.1 + ReactDOM (bundled offline, MIT) */\n' + react_src + '\n</script>\n</head>', 1)
+        print(f"  bundled React inline: {len(react_src)} bytes")
+    else:
+        print("  WARN: React not injected (already present or no </head>)")
+
 open(OUT, "w", encoding="utf-8").write(html2)
 print("BUILD OK ->", OUT, "| bytes:", len(html2))
 
