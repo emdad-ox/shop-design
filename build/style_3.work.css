@@ -405,3 +405,13 @@ html{ scroll-padding-top: 72px; scroll-padding-bottom: calc(150px + env(safe-are
 /* Touch targets: cart −/+/trash were 28–32px — extend the hit area to ≥40px without moving layout */
 #cart-list button{ position: relative; }
 #cart-list button::after{ content: ""; position: absolute; inset: -6px; }
+/* Support pill collapses to a round call button once the page scrolls, so its 270px label stops
+   covering list "+" buttons (a mis-tap there started a phone call). Full label at the top. */
+body[data-scrolled="1"] [data-fab]{ width: 46px; padding: 0 !important; justify-content: center; }
+body[data-scrolled="1"] [data-fab] > span{ display: none; }
+[data-fab]{ transition: width var(--dur-base) var(--ease-standard), padding var(--dur-base) var(--ease-standard); overflow: hidden; }
+/* Offline: remote map tiles fail by design — never let the bundler's debug error box cover the nav
+   and CTAs (errors still go to the console; the map keeps its pin-on-surface fallback). */
+#__bundler_err{ display: none !important; }
+/* Long pages: the ground gradient repeated every viewport height and drew a visible seam */
+body{ background-attachment: fixed; }

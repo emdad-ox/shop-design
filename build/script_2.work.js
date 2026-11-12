@@ -92,7 +92,7 @@ class Component extends DCLogic {
     }
     this._onKey = (e) => this.handleKey(e); document.addEventListener('keydown', this._onKey);
     // App-bar scroll elevation (P4): hairline appears once content scrolls under the sticky bar.
-    this._onScroll = () => { const v = window.scrollY > 4; if (this._scrolled !== v) { this._scrolled = v; document.body.dataset.scrolled = v ? '1' : ''; } };
+    this._onScroll = () => { const v = window.scrollY > 4; if (this._scrolled !== v) { this._scrolled = v; if (v) document.body.dataset.scrolled = '1'; else delete document.body.dataset.scrolled; } };
     window.addEventListener('scroll', this._onScroll, { passive: true });
     this._onScroll();
     // History routing (P3): seed the current route so the first Back doesn't pop an empty stack,
@@ -103,7 +103,10 @@ class Component extends DCLogic {
       if (this.state.sheet || this.state.addrSheet || this.state.inqSheet) { this._navSource = 'pop'; this.closeOverlays(); return; }
       const st = e.state || {};
       this._navSource = 'pop';
-      this.go({ route: st.eoRoute || 'home', pid: st.pid });
+      let to = st.eoRoute || 'home';
+      if (to === 'checkout' && !this.cartTotals().count) to = 'cart';
+      if (to === 'auth' && this.state.loggedIn) to = this.state.authFrom || 'profile';
+      this.go({ route: to, pid: st.pid });
     };
     window.addEventListener('popstate', this._onPop);
     this.loadGsap();
@@ -155,6 +158,9 @@ class Component extends DCLogic {
     // Track route/overlay transitions via our OWN previous values — dc-runtime does not pass a
     // reliable prevState to componentDidUpdate, so we can't depend on the framework's prevState.
     const routeChanged = this._lastRoute !== undefined && this._lastRoute !== this.state.route;
+    if (routeChanged && this.state.toastShow && performance.now() - (this._toastAt || 0) > 400) {
+      clearTimeout(this._toastT); this.setState({ toastShow: false });
+    }
     if (routeChanged) {
       // History routing (P3): every route change (including morphTo/openMorph, which bypass go())
       // funnels through here — the universal choke point. Push a state-ONLY entry (no URL: a
@@ -349,6 +355,14 @@ class Component extends DCLogic {
         onThrowComplete() { setDots(Math.round(-this.x / width())); },
       })[0];
     }
+  }
+
+  // After a failed submit, scroll the first visible error message into view (it is often above the fold).
+  revealFirstError() {
+    requestAnimationFrame(() => {
+      const el = [...document.querySelectorAll('[style*="--err)"]')].find(n => n.textContent.trim() && n.offsetParent);
+      if (el) el.scrollIntoView({ block: 'center', behavior: this.reduceMotion() ? 'auto' : 'smooth' });
+    });
   }
 
   // a11y: the 6px dot <span>s are the only non-swipe way through a carousel — make them buttons.
@@ -616,9 +630,18 @@ class Component extends DCLogic {
     return 'flex:none;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;min-width:70px;height:54px;padding:0 12px;border-radius:14px;cursor:pointer;'
       + 'border:1.5px solid ' + (sel ? 'var(--p)' : 'var(--line)') + ';background:' + (sel ? 'var(--p-soft)' : 'var(--sur)') + ';color:' + (sel ? 'var(--p)' : 'var(--tx)');
   }
-  slotChipStyle(sel) {
-    return 'display:flex;align-items:center;justify-content:center;gap:6px;height:46px;border-radius:14px;cursor:pointer;font-weight:700;font-size:12.5px;'
-      + 'border:1.5px solid ' + (sel ? 'var(--p)' : 'var(--line)') + ';background:' + (sel ? 'var(--p-soft)' : 'var(--sur)') + ';color:' + (sel ? 'var(--p)' : 'var(--tx)');
+  slotChipStyle(sel, past) {
+    return 'display:flex;align-items:center;justify-content:center;gap:6px;height:46px;border-radius:14px;cursor:' + (past ? 'not-allowed' : 'pointer') + ';font-weight:700;font-size:12.5px;'
+      + 'border:1.5px solid ' + (sel ? 'var(--p)' : 'var(--line)') + ';background:' + (sel ? 'var(--p-soft)' : 'var(--sur)') + ';color:' + (sel ? 'var(--p-ink)' : 'var(--tx)')
+      + (past ? ';opacity:.42;text-decoration:line-through' : '');
+  }
+  SLOT_START = { s1: 9, s2: 12, s3: 15, s4: 18 };
+  slotPast(day, key) { return day === 0 && new Date().getHours() >= this.SLOT_START[key]; }
+  // the slot actually in effect: the chosen one if still open, else the first open slot that day
+  effSlot(day, slot) {
+    if (slot && !this.slotPast(day, slot)) return slot;
+    const f = this.SLOTS.find(sl => !this.slotPast(day, sl[0]));
+    return f ? f[0] : '';
   }
   ctaStyle(bg, fg, busy) {
     return 'pointer-events:' + (busy ? 'none' : 'auto') + ';display:flex;align-items:center;justify-content:center;width:100%;height:50px;border:none;border-radius:999px;background:'
@@ -631,6 +654,7 @@ class Component extends DCLogic {
 
   toast(msg) {
     clearTimeout(this._toastT);
+    this._toastAt = performance.now();
     this.setState({ toastMsg: msg, toastShow: true });
     this.announce(msg);
     this._toastT = setTimeout(() => this.setState({ toastShow: false }), 3200);
@@ -981,8 +1005,9 @@ class Component extends DCLogic {
   }
 
   // ---------- auth ----------
-  goAuthFor(returnRoute, from, pending) {
-    this.go({ route: 'auth', authStep: 'phone', otp: '', authErr: '', authReturn: returnRoute, authFrom: from, pendingSubmit: pending || null });
+  goAuthFor(returnRoute, from, pending, step) {
+    this.go({ route: 'auth', authStep: step || 'phone', otp: '', authErr: '', authReturn: returnRoute, authFrom: from, pendingSubmit: pending || null });
+    if (step === 'code') this.startCountdown();
   }
   startCountdown() {
     clearInterval(this._cd);
@@ -1013,6 +1038,7 @@ class Component extends DCLogic {
       this.toast('با موفقیت وارد شدید');
       if (pending === 'refill') this.completeRefill();
       else if (pending === 'used') this.completeUsed();
+      else if (pending === 'inquiry') this.confirmInquiry();
       else this.go({ route: this.state.authReturn || 'profile' });
     });
   };
@@ -1043,10 +1069,16 @@ class Component extends DCLogic {
   confirmInquiry = () => {
     const p = this.PRODUCTS.find(x => x.id === this.state.inqPid);
     if (!p) { this.setState({ inqSheet: false, inqPid: null }); return; }
+    if (!this.state.loggedIn) {
+      this.setState({ inqSheet: false });
+      this.goAuthFor('detail', 'detail', 'inquiry');
+      this.toast('برای تماس کارشناس، شماره موبایل خود را تأیید کنید');
+      return;
+    }
     if (!this.commitGuard()) return;
     const c = this.code('IQ');
     this.go({
-      inquiries: [{ pid: p.id, title: p.title, code: c, date: this.todayFa(), ts: Date.now() }, ...this.state.inquiries],
+      inquiries: [{ pid: p.id, title: p.title, code: c, date: this.todayFa(), ts: Date.now(), phone: this.state.phone }, ...this.state.inquiries],
       route: 'formSuccess', fsKind: 'inquiry', fsCode: c, inqSheet: false, inqPid: null, busy: ''
     });
   };
@@ -1056,12 +1088,12 @@ class Component extends DCLogic {
     if (s.rfPhotoList.length < 1) errs.photos = 'حداقل یک تصویر از کپسول اضافه کنید';
     if (!s.rfGas) errs.gas = 'نوع گاز را انتخاب کنید';
     if (!s.rfDelivery) errs.delivery = 'نوع ارسال را انتخاب کنید';
-    if (!s.rfSlot) errs.slot = 'بازهٔ زمانی تحویل را انتخاب کنید';
+    if (!s.rfSlot || this.slotPast(s.rfDay, s.rfSlot)) errs.slot = 'بازهٔ زمانی تحویل را انتخاب کنید';
     if (s.rfDelivery === 'home' && !s.loggedIn && s.rfAddr.trim().length < 10) errs.addr = 'آدرس کامل تحویل را وارد کنید';
     if (!this.validPhone(s.rfPhone)) errs.phone = 'شماره موبایل معتبر وارد کنید';
     this.setState({ rfErrs: errs });
-    if (Object.keys(errs).length) { this.toast('لطفاً موارد مشخص‌شده را تکمیل کنید'); return; }
-    if (!s.loggedIn) { this.setState({ authPhone: s.rfPhone }); this.goAuthFor('refill', 'refill', 'refill'); this.toast('برای تأیید شماره، کد پیامکی ارسال می‌شود'); return; }
+    if (Object.keys(errs).length) { this.toast('لطفاً موارد مشخص‌شده را تکمیل کنید'); this.revealFirstError(); return; }
+    if (!s.loggedIn) { this.setState({ authPhone: s.rfPhone }); this.goAuthFor('refill', 'refill', 'refill', 'code'); this.toast('کد تأیید به ' + s.rfPhone + ' پیامک شد'); return; }
     this.setState({ busy: 'refill' });
     this._busyT = setTimeout(() => this.completeRefill(), 850);
   };
@@ -1076,8 +1108,8 @@ class Component extends DCLogic {
     if (dl < 10) errs.desc = 'توضیحات حداقل ۱۰ کاراکتر باشد';
     if (dl > 1000) errs.desc = 'توضیحات حداکثر ۱۰۰۰ کاراکتر است';
     this.setState({ usErrs: errs });
-    if (Object.keys(errs).length) { this.toast('لطفاً موارد مشخص‌شده را تکمیل کنید'); return; }
-    if (!s.loggedIn) { this.setState({ authPhone: s.usPhone }); this.goAuthFor('usedSale', 'usedSale', 'used'); this.toast('برای تأیید شماره، کد پیامکی ارسال می‌شود'); return; }
+    if (Object.keys(errs).length) { this.toast('لطفاً موارد مشخص‌شده را تکمیل کنید'); this.revealFirstError(); return; }
+    if (!s.loggedIn) { this.setState({ authPhone: s.usPhone }); this.goAuthFor('usedSale', 'usedSale', 'used', 'code'); this.toast('کد تأیید به ' + s.usPhone + ' پیامک شد'); return; }
     this.setState({ busy: 'used' });
     this._busyT = setTimeout(() => this.completeUsed(), 850);
   };
@@ -1135,7 +1167,10 @@ class Component extends DCLogic {
 
   placeOrder = () => {
     if (this.state.busy) return;
-    if (!this.state.coSlot) { this.toast('یک بازهٔ زمانی تحویل انتخاب کنید'); return; }
+    if (!this.cartTotals().count) { this.go({ route: 'cart' }); return; }
+    const slot = this.effSlot(this.state.coDay, this.state.coSlot);
+    if (!slot) { this.toast('برای این روز بازهٔ آزادی نمانده — روز دیگری انتخاب کنید'); return; }
+    if (slot !== this.state.coSlot) this.setState({ coSlot: slot });
     if (!this.commitGuard()) return;
     this.setState({ busy: 'order' });                 // show loading, then commit (simulated server round-trip)
     this._busyT = setTimeout(() => this._commitOrder(), 850);
@@ -1155,7 +1190,7 @@ class Component extends DCLogic {
       no, date: this.todayFa(), ts: Date.now(), count: t.count,
       subtotal: t.subtotal, disc: t.disc, discCode: s.disc || '', total: t.total,
       items, note: s.note || '', addrTitle: addr ? addr.title : '', addrText: addr ? addr.text : '',
-      delivery: this.deliveryLabel(s.coDay, s.coSlot)
+      delivery: this.deliveryLabel(s.coDay, this.effSlot(s.coDay, s.coSlot))
     };
     // Land on the itemized order-detail page (odFresh → shows the success moment), NOT the orders list.
     this.go({
@@ -1331,8 +1366,11 @@ class Component extends DCLogic {
     const hasBottomCta = (route === 'cart' && t.count > 0) || route === 'checkout' || (route === 'detail' && (curVm.canAdd || curVm.out)) || route === 'refill' || route === 'usedSale' || route === 'services';
     // Support pill shows only on the three browse pages (no bottom CTA to compete with); hidden elsewhere.
     const showFab = route === 'home' || route === 'products' || route === 'profile';
-    const fabStyle = 'position:fixed;z-index:40;inset-inline-end:16px;bottom:calc(' + (hasBottomCta ? '150px' : '86px') + ' + env(safe-area-inset-bottom));height:46px;padding:0 15px;border-radius:999px;background:var(--grad-cta);color:#fff;display:inline-flex;align-items:center;gap:8px;box-shadow:0 12px 26px -6px var(--glow);text-decoration:none;font-size:12px;font-weight:600;white-space:nowrap' + (showFab ? '' : ';display:none');
+    const fabStyle = 'position:fixed;z-index:45;inset-inline-end:16px;bottom:calc(' + (hasBottomCta ? '150px' : '86px') + ' + env(safe-area-inset-bottom));height:46px;padding:0 15px;border-radius:999px;background:var(--grad-cta);color:#fff;display:inline-flex;align-items:center;gap:8px;box-shadow:0 12px 26px -6px var(--glow);text-decoration:none;font-size:12px;font-weight:600;white-space:nowrap' + (showFab ? '' : ';display:none');
 
+    // Toast rides above whatever owns the bottom edge on this route (CTA bar / services card / pill / nav).
+    const toastBottom = route === 'services' ? 188 : hasBottomCta ? 150 : showFab ? 142 : 88;
+    const toastWrapStyle = 'position:fixed;bottom:calc(' + toastBottom + 'px + env(safe-area-inset-bottom));left:0;right:0;z-index:60;pointer-events:none;display:flex;justify-content:center';
     return {
       isHome: route === 'home', isProducts: route === 'products', isDetail: route === 'detail',
       isCart: route === 'cart', isCheckout: route === 'checkout', isSuccess: route === 'success',
@@ -1464,7 +1502,7 @@ class Component extends DCLogic {
       // auth
       authPhoneStep: s.authStep === 'phone', authCodeStep: s.authStep === 'code',
       authPhone: s.authPhone, onAuthPhone: (e) => this.setState({ authPhone: this.deFa(e.target.value), authErr: '' }),
-      otp: s.otp, onOtp: (e) => this.setState({ otp: e.target.value.slice(0, 6), authErr: '' }),
+      otp: s.otp, onOtp: (e) => { const v = e.target.value.slice(0, 6); this.setState({ otp: v, authErr: '' }, () => { if (this.deFa(v).length === 6) this.verifyOtp(); }); },
       authErr: s.authErr,
       sendOtp: this.sendOtp, verifyOtp: this.verifyOtp,
       editPhone: () => { clearInterval(this._cd); this.setState({ authStep: 'phone', otp: '', authErr: '', resendIn: 0 }); },
@@ -1482,7 +1520,7 @@ class Component extends DCLogic {
       rfErrPhotos: s.rfErrs.photos || '', rfErrGas: s.rfErrs.gas || '', rfErrDelivery: s.rfErrs.delivery || '',
       rfErrAddr: s.rfErrs.addr || '', rfErrPhone: s.rfErrs.phone || '', rfErrSlot: s.rfErrs.slot || '',
       rfDays: [0, 1, 2, 3].map(off => { const d = this.dayLabel(off); return { key: off, label: d.name, sub: d.date, style: this.dayChipStyle(s.rfDay === off), pick: () => this.setState({ rfDay: off }) }; }),
-      rfSlots: this.SLOTS.map(sl => ({ key: sl[0], label: sl[1], style: this.slotChipStyle(s.rfSlot === sl[0]), pick: () => this.setState({ rfSlot: sl[0], rfErrs: { ...s.rfErrs, slot: '' } }) })),
+      rfSlots: this.SLOTS.map(sl => { const past = this.slotPast(s.rfDay, sl[0]); return { key: sl[0], label: sl[1], style: this.slotChipStyle(s.rfSlot === sl[0] && !past, past), pick: () => { if (!past) this.setState({ rfSlot: sl[0], rfErrs: { ...s.rfErrs, slot: '' } }); } }; }),
       submitRefill: this.submitRefill,
 
       // used-sale form
@@ -1522,7 +1560,7 @@ class Component extends DCLogic {
 
       // delivery scheduler (P7)
       coDays: [0, 1, 2, 3].map(off => { const d = this.dayLabel(off); return { key: off, label: d.name, sub: d.date, style: this.dayChipStyle(s.coDay === off), pick: () => this.setState({ coDay: off }) }; }),
-      coSlots: this.SLOTS.map(sl => ({ key: sl[0], label: sl[1], style: this.slotChipStyle(s.coSlot === sl[0]), pick: () => this.setState({ coSlot: sl[0] }) })),
+      coSlots: this.SLOTS.map(sl => { const past = this.slotPast(s.coDay, sl[0]); return { key: sl[0], label: sl[1], style: this.slotChipStyle(this.effSlot(s.coDay, s.coSlot) === sl[0], past), pick: () => { if (!past) this.setState({ coSlot: sl[0] }); } }; }),
       successDelivery: s.orders[0] ? (s.orders[0].delivery || '') : '',
 
       ordersList: s.orders.map(o => ({ no: o.no, date: o.date, countLabel: this.fmt(o.count), totalLabel: this.fmt(o.total), delivery: o.delivery || 'هماهنگی تلفنی', open: () => this.go({ route: 'orderDetail', odId: o.no, odFresh: false }), ...this.stepperVM('order', o.ts) })),
@@ -1546,7 +1584,7 @@ class Component extends DCLogic {
       wishEmpty: wishIds.length === 0,
 
       toastShow: s.toastShow, toastMsg: s.toastMsg,
-      fabStyle,
+      fabStyle, toastWrapStyle,
       navPillStyle,
       navs
     };
