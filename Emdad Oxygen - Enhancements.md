@@ -99,3 +99,18 @@ Build stays green (all exact-match markup edits resolve `x1`, except the two ser
 ### Bottom-sheet "disappears after open" fix
 Every bottom sheet (filter/sort, address picker, price-inquiry confirm) would slide up and then vanish a moment later. Cause: `manageSheetDrag` did `gsap.set(panel, { y: 0, clearProps: 'transform' })` before creating the drag handler — clearing the transform made `Draggable.create()` snapshot the `sheetIn` entrance animation's **start** value (translateY 100%) and pin the panel there via inline `translate3d(0, <panelHeight>, 0)`; once the CSS animation finished the panel reverted to that off-screen offset. Fixed by keeping the inline `y:0` (removed `clearProps`), so Draggable reads 0 and the sheet rests correctly. Verified: the panel's resting inline transform is now `translate3d(0px, 0px, 0px)` instead of `translate3d(0px, 395px, 0px)`.
 - Also (same review): sort/in-stock picks **inside** the open filter sheet now use a plain `setState` instead of a View-Transitions list-flip (the flip painted the product cards over the open sheet); page chips keep their animation. The filter button also got an `aria-label`.
+
+## Update — prototype UI/UX pass (Nov 2026, branch `prototype`)
+A Head-of-Design review with three associate designers (visual system / flows / accessibility+RTL). Full write-up: `docs/reviews/2026-11_prototype-design-review.md`.
+- **Truly offline now:** React 18.3.1 is inlined by `build.py`. Before this, the app fetched React from unpkg.com and stayed blank without a network.
+- **Design-refactor CSS layer actually applies:** its hooks never matched React's `prop: value` inline styles. The 12px floor, weight ramp and entrance stagger now take effect.
+- **AA contrast in both themes:** deeper dark CTA and hero gradients, AA light status tokens, new `--p-ink` and `--focus` tokens.
+- **Flows:**
+  - No empty or 0-toman orders, and Back no longer reopens an empty checkout.
+  - The toast never covers a CTA, and the support pill no longer aborts view transitions.
+  - Past delivery slots are disabled, and checkout preselects the first open slot.
+  - OTP submits automatically, a guest price inquiry asks for a verified phone, and out-of-stock shows "notify me".
+- **a11y:**
+  - The theme switches have names and states, inputs have labels and autocomplete, and toasts use a persistent live region.
+  - Carousel dots work from the keyboard, and the carousel can be paused.
+  - Focus never hides under sticky chrome.
