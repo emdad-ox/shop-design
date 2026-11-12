@@ -6,9 +6,22 @@ html,body{margin:0;padding:0}
 body[data-theme="dark"] .leaflet-tile{filter:brightness(.7) invert(1) contrast(.92) hue-rotate(180deg) saturate(.75)}
 .leaflet-container{border-radius:inherit}
 body{
-  /* ===== Emdad brand — PURPLE primary, TEAL-CYAN secondary (matches امداد اکسیژن تهران site) — light ===== */
-  --bg:#f1eff7; --bg2:#e9e5f2;
-  --sur:rgba(255,255,255,.74); --sur2:rgba(233,229,246,.55); --tx:#241c40; --tx2:#5c5478; --line:rgba(36,28,64,.10);
+  /* ===== Apple system design (iOS HIG) + glass materials — LIGHT =====
+     Neutrals follow iOS system colors (systemGroupedBackground / label / secondaryLabel / separator);
+     the Emdad PURPLE is the app TINT and TEAL-CYAN the secondary accent. */
+  --bg:#f2f2f7; --bg2:#e9e7f3;                         /* systemGroupedBackground → faint brand lift */
+  --sur:var(--glass);                                  /* every card/surface is a glass material */
+  --sur2:rgba(118,118,128,.12);                        /* tertiarySystemFill: wells, fields, segments */
+  --tx:#1c1c1e; --tx2:#636366;                         /* label / secondaryLabel (solid: 5.5:1 on bg) */
+  --line:rgba(60,60,67,.16);                           /* separator */
+  /* glass materials (ultraThin → thick), the hairline edge and the specular top highlight */
+  --glass-thin:rgba(255,255,255,.48); --glass:rgba(255,255,255,.64); --glass-thick:rgba(255,255,255,.80);
+  --glass-chrome:rgba(249,249,252,.70);                /* bars: navigation bar / tab bar */
+  --glass-edge:rgba(255,255,255,.70); --glass-spec:inset 0 1px 0 rgba(255,255,255,.85);
+  --glass-blur:22px; --glass-sat:180%;
+  --glass-shadow:0 1px 1px rgba(0,0,0,.04), 0 10px 30px -12px rgba(40,30,90,.18);
+  --fill:rgba(118,118,128,.12);                        /* iOS text-field / search-field fill */
+  --switch-on:#34c759;                                 /* systemGreen (iOS switch) */
   --p:#6250a8; --p-deep:#4c3d86; --onp:#ffffff;
   --acc:#1aa8bd;   /* SECONDARY = teal-cyan (the site's accent/logo/CTA hue) */
   --s:var(--acc); --s-soft:var(--acc-soft); --s-ink:var(--acc-ink);   /* semantic alias for the secondary */
@@ -25,7 +38,7 @@ body{
      var() refs resolve per-theme). --grad-brand = large surfaces (hero/logo); --grad-cta = buttons. */
   --grad-brand:linear-gradient(140deg, var(--p-deep) 0%, var(--p) 50%, var(--acc) 128%);
   --grad-cta:linear-gradient(140deg, var(--p) 0%, color-mix(in oklab, var(--p-deep) 76%, var(--acc)) 100%);
-  --ok:#147a43; --ok-soft:#dbf4e9; --err:#bf1534; --err-soft:#fbe3e8; --warn:#8a5a00; --warn-soft:#faf0d8;   /* --err → truer crimson so it never reads like the coral secondary */
+  --ok:#1e7a37; --ok-soft:#e1f5e6; --err:#c4001a; --err-soft:#fde4e6; --warn:#8a5300; --warn-soft:#fdf0d9;   /* iOS accessible systemGreen/Red/Orange (≥4.5:1 on their soft fills) */   /* --err → truer crimson so it never reads like the coral secondary */
   --blur:16px;
   /* elevation ramp — cool-neutral ink (not teal); colored glow reserved for hero (--e4) */
   --edge:inset 0 1px 0 rgba(255,255,255,.55);
@@ -40,9 +53,17 @@ body{
   background:var(--bg);
 }
 body[data-theme="dark"]{
-  /* ===== Emdad brand — PURPLE primary, TEAL-CYAN secondary — dark ===== */
-  --bg:#151026; --bg2:#1c1638;
-  --sur:rgba(42,34,68,.55); --sur2:rgba(28,22,52,.5); --tx:#efeafc; --tx2:#b0a8cf; --line:rgba(255,255,255,.10);
+  /* ===== Apple system design (iOS HIG) + glass materials — DARK ===== */
+  --bg:#08070d; --bg2:#13101f;                         /* near-black grouped background, brand-tinted */
+  --sur:var(--glass); --sur2:rgba(118,118,128,.24);
+  --tx:#f5f5f7; --tx2:#a1a1a8;                         /* label / secondaryLabel (solid: 7.6:1 on bg) */
+  --line:rgba(255,255,255,.12);
+  --glass-thin:rgba(40,38,52,.40); --glass:rgba(44,42,58,.52); --glass-thick:rgba(36,34,48,.74);
+  --glass-chrome:rgba(22,21,30,.66);
+  --glass-edge:rgba(255,255,255,.13); --glass-spec:inset 0 1px 0 rgba(255,255,255,.10);
+  --glass-shadow:0 1px 1px rgba(0,0,0,.30), 0 14px 34px -14px rgba(0,0,0,.70);
+  --fill:rgba(118,118,128,.24);
+  --switch-on:#30d158;
   --p:#8f7cdd; --p-deep:#6b58be; --onp:#16112c;
   --acc:#41d0e2;   /* SECONDARY = teal-cyan (dark) */
   --s:var(--acc); --s-soft:var(--acc-soft); --s-ink:var(--acc-ink);
@@ -58,7 +79,7 @@ body[data-theme="dark"]{
   /* deeper brand ramps in dark so white text sits ≥4.5:1 (CTA 3.45→5.6, hero 2.7→7.4) */
   --grad-cta:linear-gradient(140deg, var(--p-deep) 0%, color-mix(in oklab, #5a47a8 80%, var(--acc)) 100%);
   --grad-brand:linear-gradient(140deg, #3f3185 0%, #5a48a8 52%, color-mix(in oklab, var(--acc) 55%, #3f3185) 128%);
-  --ok:#2ecf88; --ok-soft:#103029; --err:#ff5a74; --err-soft:#3e2028; --warn:#e3a63a; --warn-soft:#3a2e14;   /* --err → crimson-rose, distinct from coral secondary */
+  --ok:#30d158; --ok-soft:#0f2e1a; --err:#ff6961; --err-soft:#3a1716; --warn:#ffb340; --warn-soft:#3a2a10;   /* iOS dark accessible system colors */   /* --err → crimson-rose, distinct from coral secondary */
   --blur:18px;
   --edge:inset 0 1px 0 rgba(255,255,255,.06);
   --e0:inset 0 1px 2px rgba(0,0,0,.5);
@@ -72,8 +93,8 @@ body[data-theme="dark"]{
 }
 body{position:relative;background:linear-gradient(160deg,var(--bg),var(--bg2))}
 body::before,body::after{content:"";position:fixed;z-index:0;border-radius:999px;pointer-events:none;filter:blur(44px);will-change:transform}
-body::before{width:60vw;height:60vw;max-width:520px;max-height:520px;top:-14vh;inset-inline-start:-16vw;background:var(--aur1);opacity:.5;animation:auroraA 16s ease-in-out infinite}
-body::after{width:56vw;height:56vw;max-width:480px;max-height:480px;bottom:-12vh;inset-inline-end:-14vw;background:var(--aur2);opacity:.38;animation:auroraB 20s ease-in-out infinite}
+body::before{width:60vw;height:60vw;max-width:520px;max-height:520px;top:-14vh;inset-inline-start:-16vw;background:var(--aur1);opacity:.62;animation:auroraA 16s ease-in-out infinite}
+body::after{width:56vw;height:56vw;max-width:480px;max-height:480px;bottom:-12vh;inset-inline-end:-14vw;background:var(--aur2);opacity:.48;animation:auroraB 20s ease-in-out infinite}
 /* glass: frost any surface-token element over the ground (gentler saturation now the ground is neutral) */
 [style*="background:var(--sur)"],[style*="background: var(--sur)"],[style*="background:var(--sur2)"],[style*="background: var(--sur2)"]{
   -webkit-backdrop-filter:blur(var(--blur)) saturate(1.08); backdrop-filter:blur(var(--blur)) saturate(1.08);
@@ -304,14 +325,12 @@ button[style*="height:34px"][style*="border-radius:999px"],button[style*="height
   height: 40px !important; font-size: 15px !important; padding-inline: 16px !important;
 }
 
-/* WI-07 — product cards go MATTE so the price reads crisply over the aurora (light-first).
-   [data-pid] is on all 4 card variants; drop the backdrop blur and use an opaque surface.
-   Elevation/border stay (the --sur box-shadow hook still matches the inline style). */
-body{ --sur-solid:#f8f6fc; }
-body[data-theme="dark"]{ --sur-solid:#221b3d; }
+/* WI-07 (revised for the glass system) — product cards use the THICK glass material: still
+   frosted, but opaque enough that the price reads crisply over the aurora in both themes. */
 [data-pid]{
-  background: var(--sur-solid) !important;
-  -webkit-backdrop-filter: none !important; backdrop-filter: none !important;
+  background: var(--glass-thick) !important;
+  -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-sat)) !important;
+  backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-sat)) !important;
 }
 /* the price inside a card: pin to 700 + 15px so it's the anchor of the card */
 [data-pid] [style*="font-weight:800"],[data-pid] [style*="font-weight: 800"]{ font-weight: 700 !important; font-size: 15px !important; }
@@ -415,3 +434,136 @@ body[data-scrolled="1"] [data-fab] > span{ display: none; }
 #__bundler_err{ display: none !important; }
 /* Long pages: the ground gradient repeated every viewport height and drew a visible seam */
 body{ background-attachment: fixed; }
+
+/* ============================================================================
+   APPLE SYSTEM DESIGN + GLASSMORPHISM  (prototype branch, Nov 2026)
+   iOS Human Interface Guidelines mapped onto the existing hooks:
+   · Materials — every surface is frosted glass: translucent fill + backdrop blur/saturate,
+     a 0.5px light hairline edge and a specular top highlight (Liquid-Glass style).
+   · Bars — glass navigation bar with a LARGE TITLE that collapses to an inline title on scroll;
+     a FLOATING glass capsule tab bar (iOS 26) with a glass "lens" on the selected tab.
+   · Controls — capsule buttons (50pt), iOS search/text fields on a gray fill, the iOS switch,
+     glass sheets with a grabber, a glass HUD toast, inset-grouped lists with inset separators.
+   · Accessibility — honours Reduce Transparency (solid materials) and a no-backdrop fallback.
+   Persian note: Apple's negative title tracking is deliberately NOT applied (letter-spacing
+   breaks Arabic-script joining); Vazirmatn stays the bundled face so the file works offline.
+   ============================================================================ */
+
+/* ---- Material: cards & surfaces ---- */
+div[style*="background:var(--sur)"],div[style*="background: var(--sur)"],
+[role="button"][style*="background: var(--sur)"],button[style*="background: var(--sur)"]{
+  -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-sat));
+  backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-sat));
+  border-color: var(--glass-edge) !important;
+  box-shadow: var(--glass-shadow), var(--glass-spec) !important;
+}
+[data-pid]{ border-color: var(--glass-edge) !important; box-shadow: var(--glass-shadow), var(--glass-spec) !important; }
+/* recessed wells (image stages, icon tiles) are a fill, not a raised material */
+div[style*="background:var(--sur2)"],div[style*="background: var(--sur2)"]{ box-shadow: none; }
+
+/* ---- Navigation bar: glass chrome + large title ---- */
+[data-appbar]{
+  background: var(--glass-chrome) !important;
+  -webkit-backdrop-filter: blur(30px) saturate(var(--glass-sat)) !important;
+  backdrop-filter: blur(30px) saturate(var(--glass-sat)) !important;
+  border-bottom: .5px solid transparent;
+}
+body[data-scrolled="1"] [data-appbar]{ background: var(--glass-chrome) !important; border-bottom-color: var(--line); }
+/* tab-root screens: the h1 IS the bar → iOS large title (fixed bar height, so collapsing never shifts layout) */
+h1[data-appbar]{
+  height: 64px; display: flex; align-items: center;
+  font-size: 28px !important; font-weight: 800 !important; line-height: 1.2;
+  transition: font-size var(--dur-base) var(--ease-standard), height var(--dur-base) var(--ease-standard), border-color var(--dur-base) var(--ease-standard);
+}
+body[data-scrolled="1"] h1[data-appbar]{ height: 52px; font-size: 17px !important; font-weight: 700 !important; justify-content: center; }
+/* drill-in bars: inline title, 17pt semibold (iOS navigation title) */
+div[data-appbar] h1, div[data-appbar] > div[style*="font-weight"]{ font-size: 17px !important; font-weight: 700 !important; }
+/* bar buttons (back, wishlist, theme): small glass circles with the tint colour (iOS 26 toolbar glass) */
+[data-appbar] button[style*="width:40px"],[data-appbar] button[style*="width: 40px"]{
+  background: var(--glass) !important; border: .5px solid var(--glass-edge) !important; color: var(--p-ink) !important;
+  -webkit-backdrop-filter: blur(16px) saturate(var(--glass-sat)); backdrop-filter: blur(16px) saturate(var(--glass-sat));
+  box-shadow: var(--glass-spec), 0 2px 10px -4px rgba(0,0,0,.18) !important;
+}
+
+/* ---- Tab bar: floating glass capsule ---- */
+[data-tabbar]{
+  left: max(12px, calc(50vw - 207px)) !important; right: max(12px, calc(50vw - 207px)) !important;
+  bottom: calc(8px + env(safe-area-inset-bottom)) !important;
+  border-radius: 32px !important; border: .5px solid var(--glass-edge) !important; border-top-width: .5px !important;
+  background: var(--glass-chrome) !important;
+  -webkit-backdrop-filter: blur(30px) saturate(var(--glass-sat)); backdrop-filter: blur(30px) saturate(var(--glass-sat));
+  box-shadow: 0 12px 34px -10px rgba(0,0,0,.28), var(--glass-spec) !important;
+}
+[data-tabbar] > div{ padding: 6px !important; }
+[data-tabbar] [data-navtab]{ border-radius: 26px; }
+[data-tabbar] [data-navtab] svg{ width: 23px; height: 23px; }
+
+/* ---- Buttons ---- */
+/* filled (prominent) capsules: specular rim + soft tinted lift */
+button[style*="background:var(--p)"],button[style*="background: var(--p)"]{
+  border-radius: 999px !important;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.28), 0 10px 24px -12px var(--glow) !important;
+}
+/* bordered/secondary buttons become glass */
+button[style*="background: var(--sur)"]{ color: var(--tx); }
+/* iOS press feedback: a quick dim plus a slight squash */
+button:active,[role="button"]:active{ opacity: .72; }
+
+/* ---- Fields: iOS gray-filled text fields & search field ---- */
+input[style*="background: var(--sur)"],textarea[style*="background: var(--sur)"],
+input[style*="background:var(--sur)"],textarea[style*="background:var(--sur)"],
+input[style*="background: var(--bg)"]{
+  background: var(--fill) !important; border-color: transparent !important; border-radius: 12px !important;
+  -webkit-backdrop-filter: none; backdrop-filter: none;
+}
+input:focus,textarea:focus{ border-color: transparent !important; box-shadow: 0 0 0 2px var(--p) !important; }
+div:has(> input[type="search"]){
+  background: var(--fill) !important; border-color: transparent !important; border-radius: 12px !important;
+  box-shadow: none !important; -webkit-backdrop-filter: none !important; backdrop-filter: none !important;
+}
+div:has(> input[type="search"]:focus){ box-shadow: 0 0 0 2px var(--p) !important; }
+input[type="search"]::-webkit-search-cancel-button{ -webkit-appearance: none; }
+
+/* ---- Inset-grouped lists: inset separators, no rule under the last row ---- */
+div[style*="overflow: hidden"] > button[role="button"][style*="border-bottom: 1px solid var(--line)"]{
+  border-bottom: none !important; position: relative;
+}
+div[style*="overflow: hidden"] > button[role="button"][style*="border-bottom: 1px solid var(--line)"]::after{
+  content: ""; position: absolute; bottom: 0; inset-inline-start: 64px; inset-inline-end: 0; height: .5px; background: var(--line);
+}
+
+/* ---- Sheets: thick glass, larger continuous radius, grabber ---- */
+[style*="sheetIn"]{
+  background: var(--glass-thick) !important;
+  -webkit-backdrop-filter: blur(40px) saturate(var(--glass-sat)) !important; backdrop-filter: blur(40px) saturate(var(--glass-sat)) !important;
+  border-radius: 28px 28px 0 0 !important; border: .5px solid var(--glass-edge); border-bottom: none;
+  box-shadow: 0 -12px 40px -12px rgba(0,0,0,.30), var(--glass-spec) !important;
+}
+
+/* ---- Toast: glass HUD capsule ---- */
+div[aria-hidden="true"][style*="toastIn"]{
+  background: var(--glass-thick) !important; color: var(--tx) !important;
+  -webkit-backdrop-filter: blur(30px) saturate(var(--glass-sat)); backdrop-filter: blur(30px) saturate(var(--glass-sat));
+  border: .5px solid var(--glass-edge); box-shadow: 0 12px 30px -10px rgba(0,0,0,.30), var(--glass-spec) !important;
+}
+
+/* ---- Support pill & floating CTAs ride the same rim light ---- */
+[data-fab]{ box-shadow: inset 0 1px 0 rgba(255,255,255,.28), 0 12px 26px -8px var(--glow) !important; }
+/* the old opaque scrim under floating CTAs fought the glass — let content blur under them instead */
+[style*="z-index: 30"][style*="pointer-events: none"] > div > button[style*="background: var(--sur)"]{
+  background: var(--glass-thick) !important;
+}
+
+/* ---- Accessibility: Reduce Transparency → solid materials; no backdrop-filter → solid ---- */
+@media (prefers-reduced-transparency: reduce){
+  body{ --glass-thin:#ffffff; --glass:#ffffff; --glass-thick:#ffffff; --glass-chrome:#f9f9f9; }
+  body[data-theme="dark"]{ --glass-thin:#1c1c1e; --glass:#1c1c1e; --glass-thick:#1c1c1e; --glass-chrome:#121214; }
+  body::before,body::after{ display: none; }
+}
+@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))){
+  body{ --glass-thin:#ffffff; --glass:#ffffff; --glass-thick:#ffffff; --glass-chrome:#f9f9f9; }
+  body[data-theme="dark"]{ --glass-thin:#1c1c1e; --glass:#1c1c1e; --glass-thick:#1c1c1e; --glass-chrome:#121214; }
+}
+/* Floating CTA bars sit on a clear 12px gap above the floating capsule tab bar (8 + 64 + 12) */
+[style*="z-index:30"][style*="pointer-events:none"],
+[style*="z-index: 30"][style*="pointer-events: none"]{ bottom: calc(84px + env(safe-area-inset-bottom)) !important; }

@@ -109,6 +109,12 @@ class Component extends DCLogic {
       this.go({ route: to, pid: st.pid });
     };
     window.addEventListener('popstate', this._onPop);
+    // live-follow a system light/dark switch while the user hasn't chosen a theme
+    try {
+      this._mq = matchMedia('(prefers-color-scheme: dark)');
+      this._onScheme = () => { if (!this.state.theme) this.setState({}); };
+      this._mq.addEventListener('change', this._onScheme);
+    } catch (e) {}
     this.loadGsap();
     this.manageMaps();
     this.manageSheetA11y();
@@ -193,6 +199,7 @@ class Component extends DCLogic {
     if (this._hydrated) this.persist();
   }
   componentWillUnmount() {
+    if (this._mq && this._onScheme) this._mq.removeEventListener('change', this._onScheme);
     document.removeEventListener('keydown', this._onKey);
     if (this._onScroll) window.removeEventListener('scroll', this._onScroll);
     if (this._onPop) window.removeEventListener('popstate', this._onPop);
@@ -545,7 +552,12 @@ class Component extends DCLogic {
     });
   }
 
-  theme() { return this.state.theme ?? (this.props.defaultTheme ?? 'light'); }
+  theme() {
+    if (this.state.theme) return this.state.theme;
+    // Apple default: follow the system appearance until the user explicitly picks a theme
+    try { if (window.matchMedia) return matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light'; } catch (e) {}
+    return this.props.defaultTheme ?? 'light';
+  }
   applyTheme() {
     document.body.dataset.theme = this.theme();
     // Only override the per-theme CSS --acc token when a custom accent prop is supplied,
@@ -1322,7 +1334,7 @@ class Component extends DCLogic {
     const rfTiles = tiles(s.rfPhotoList, 'rfPhotoList');
     const usTiles = tiles(s.usPhotoList, 'usPhotoList');
 
-    const navBase = 'position:relative;z-index:1;display:flex;flex-direction:column;align-items:center;gap:3px;padding:var(--sp-2) 0;border:none;background:none;cursor:pointer;border-radius:var(--r-sm);';
+    const navBase = 'position:relative;z-index:1;display:flex;flex-direction:column;align-items:center;gap:2px;padding:7px 0 6px;border:none;background:none;cursor:pointer;border-radius:var(--r-sm);';
     const navDefs = [
       { key: 'home', label: 'خانه', d: 'M3 10.5L12 3l9 7.5V20a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1z', go: () => this.go({ route: 'home' }) },
       { key: 'products', label: 'محصولات', d: 'M4 4h7v7H4zM13 4h7v7h-7zM4 13h7v7H4zM13 13h7v7h-7z', go: () => this.go({ route: 'products' }) },
@@ -1338,7 +1350,7 @@ class Component extends DCLogic {
     };
     const activeKey = route === 'auth' ? (activeMap[s.authFrom] || 'profile') : (activeMap[route] || 'home');
     const pillIdx = Math.max(0, this.TAB_ORDER.indexOf(activeKey));
-    const navPillStyle = 'position:absolute;top:6px;bottom:calc(6px + env(safe-area-inset-bottom));inset-inline-start:calc(8px + ' + pillIdx + ' * (100% - 16px) / 5);width:calc((100% - 16px) / 5);background:var(--p-soft);border-radius:14px;pointer-events:none;z-index:0;transition:inset-inline-start .34s var(--ease-emphasized)';
+    const navPillStyle = 'position:absolute;top:6px;bottom:6px;inset-inline-start:calc(6px + ' + pillIdx + ' * (100% - 12px) / 5);width:calc((100% - 12px) / 5);background:color-mix(in oklab, var(--p) 16%, transparent);box-shadow:inset 0 1px 0 rgba(255,255,255,.35), inset 0 0 0 .5px color-mix(in oklab, var(--p) 30%, transparent);border-radius:26px;pointer-events:none;z-index:0;transition:inset-inline-start .42s cubic-bezier(.3,1.35,.5,1)';
     const navs = navDefs.map(n => ({
       ...n,
       style: navBase + (n.key === activeKey ? 'color:var(--p-ink);font-weight:800' : 'color:var(--tx2)'),
@@ -1424,8 +1436,8 @@ class Component extends DCLogic {
       closeSheet: () => this.setState({ sheet: false }),
       stockSwitchStyle: 'display:inline-block;width:44px;height:26px;border-radius:var(--r-pill);position:relative;transition:background .2s;background:' + (s.inStock ? 'var(--p)' : 'var(--line)'),
       stockKnobStyle: 'position:absolute;top:3px;width:20px;height:20px;border-radius:var(--r-pill);background:#fff;transition:inset-inline-start .2s;inset-inline-start:' + (s.inStock ? '21px' : '3px'),
-      themeSwitchStyle: 'display:inline-block;flex:none;border:none;padding:0;width:44px;height:26px;border-radius:var(--r-pill);position:relative;transition:background .2s;cursor:pointer;background:' + (dark ? 'var(--p)' : 'var(--line)'),
-      themeKnobStyle: 'position:absolute;top:3px;width:20px;height:20px;border-radius:var(--r-pill);background:#fff;transition:inset-inline-start .2s;inset-inline-start:' + (dark ? '21px' : '3px'),
+      themeSwitchStyle: 'display:inline-block;flex:none;border:none;padding:0;width:51px;height:31px;border-radius:var(--r-pill);position:relative;transition:background .25s;cursor:pointer;background:' + (dark ? 'var(--switch-on)' : 'var(--fill)'),
+      themeKnobStyle: 'position:absolute;top:2px;width:27px;height:27px;border-radius:var(--r-pill);background:#fff;box-shadow:0 3px 8px rgba(0,0,0,.15),0 3px 1px rgba(0,0,0,.06);transition:inset-inline-start .25s cubic-bezier(.3,1.3,.5,1);inset-inline-start:' + (dark ? '22px' : '2px'),
 
       cur: curVm,
       related: this.PRODUCTS.filter(p => p.cat === cur.cat && p.id !== cur.id).slice(0, 2).map(p => this.vm(p)),

@@ -592,5 +592,11 @@
     "find": "<button disabled=\"{{ true }}\" style=\"width:100%;height:50px;border:none;border-radius:999px;background:var(--sur2);color:var(--tx2);font-weight:800;font-size:14.5px\">ناموجود</button>",
     "replace": "<button onclick=\"{{ cur.inquire }}\" style=\"width:100%;height:50px;border:1.5px solid var(--line);border-radius:999px;background:var(--sur);color:var(--tx);font-weight:800;font-size:14.5px;cursor:pointer\">ناموجود — موجود شد خبرم کنید</button>",
     "count": 1
+  },
+  {
+    "what": "APPLE: hook for the floating glass tab bar",
+    "find": "<div style=\"position:fixed;bottom:0;left:0;right:0;z-index:40;background:var(--sur);border-top:1px solid var(--line)\">",
+    "replace": "<div data-tabbar=\"\" style=\"position:fixed;bottom:0;left:0;right:0;z-index:40;background:var(--sur);border-top:1px solid var(--line)\">",
+    "count": 1
   }
 ]

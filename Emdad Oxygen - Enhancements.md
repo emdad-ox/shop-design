@@ -114,3 +114,21 @@ A Head-of-Design review with three associate designers (visual system / flows / 
   - The theme switches have names and states, inputs have labels and autocomplete, and toasts use a persistent live region.
   - Carousel dots work from the keyboard, and the carousel can be paused.
   - Focus never hides under sticky chrome.
+
+## Update — Apple system design + glassmorphism (branch `prototype`)
+The UI now follows the iOS Human Interface Guidelines, with Liquid-Glass-style materials:
+- **Colors.** iOS system neutrals: `systemGroupedBackground`, `label`, `secondaryLabel` and `separator`, plus Apple's accessible green, red and orange. The Emdad purple remains the app **tint** and teal-cyan remains the accent.
+- **Glass materials.** New `--glass-thin / --glass / --glass-thick / --glass-chrome` tokens. Each is a translucent fill with backdrop blur and saturation, a 0.5px light edge and a specular top highlight. Cards, product cards, sheets, toasts and bars all use them.
+- **Navigation bar.** A glass bar with a **large title** (28pt) on tab screens. On scroll it collapses to a centered 17pt inline title without shifting the layout. Bar buttons are small glass circles in the tint color.
+- **Tab bar.** A **floating glass capsule** (iOS 26 style). The selected tab sits under a glass lens that moves between tabs with a spring.
+- **Controls.**
+  - Buttons: filled capsule buttons with a light top edge; buttons dim when pressed.
+  - Fields: text and search fields use the iOS gray fill.
+  - Switch: the iOS switch (51×31, green when on).
+  - Sheets: a glass sheet with a grabber.
+  - Toast: a glass capsule.
+  - Lists: grouped lists with inset separators.
+  - Floating action buttons: placed in a 12px gap above the tab bar.
+- **Appearance.** The theme follows the system light/dark setting live until the user chooses one, as Apple apps do.
+- **Accessibility.** With Reduce Transparency on, or in browsers without `backdrop-filter`, the glass materials become solid surfaces.
+- **Persian note.** Apple's negative tracking on titles is deliberately not applied, because letter-spacing breaks the joined letters of Arabic script. Vazirmatn stays the bundled font so the file still works offline.
