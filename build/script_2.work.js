@@ -329,14 +329,14 @@ class Component extends DCLogic {
     const width = () => viewport.getBoundingClientRect().width || 320;
     const dots = [...document.querySelectorAll('[data-hero-dots] [data-dot]')];
     const clamp = (i) => Math.max(0, Math.min(N - 1, i));
-    const setDots = (i) => dots.forEach((d, k) => { const a = k === clamp(i); d.style.width = a ? '16px' : '6px'; d.style.background = a ? 'var(--p)' : 'var(--line)'; });
+    const setDots = (i) => dots.forEach((d, k) => { const a = k === clamp(i); d.style.width = a ? '16px' : '6px'; d.style.background = a ? 'var(--p)' : 'var(--line)'; d.setAttribute('aria-current', a ? 'true' : 'false'); });
     const goTo = (i, animate) => {
       i = clamp(i); const x = -i * width();
       if (g && !self.reduceMotion() && animate !== false) g.to(track, { x: x, duration: 0.4, ease: 'power3.out', overwrite: 'auto' });
       else if (g) g.set(track, { x: x }); else track.style.transform = 'translateX(' + x + 'px)';
       setDots(i);
     };
-    dots.forEach((d, i) => { d.onclick = () => goTo(i, true); });
+    this.wireDots(dots, (i) => goTo(i, true));
     goTo(0, false);
     if (this._gsapReady && window.Draggable) {
       this._heroDrag = window.Draggable.create(track, {
@@ -349,6 +349,16 @@ class Component extends DCLogic {
         onThrowComplete() { setDots(Math.round(-this.x / width())); },
       })[0];
     }
+  }
+
+  // a11y: the 6px dot <span>s are the only non-swipe way through a carousel — make them buttons.
+  wireDots(dots, onPick) {
+    dots.forEach((d, i) => {
+      d.setAttribute('role', 'button'); d.tabIndex = 0;
+      d.setAttribute('aria-label', 'اسلاید ' + this.fmt(i + 1));
+      d.onclick = () => onPick(i);
+      d.onkeydown = (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onPick(i); } };
+    });
   }
 
   // Home hero slideshow: a 2-slide auto-playing carousel (brand banner + promo image → services)
@@ -371,7 +381,7 @@ class Component extends DCLogic {
     const dots = [...document.querySelectorAll('[data-home-hero-dots] [data-dot]')];
     const wrap = (i) => ((i % N) + N) % N;
     let cur = 0;
-    const setDots = (i) => dots.forEach((d, k) => { const a = k === i; d.style.width = a ? '16px' : '6px'; d.style.background = a ? 'var(--p)' : 'var(--line)'; });
+    const setDots = (i) => dots.forEach((d, k) => { const a = k === i; d.style.width = a ? '16px' : '6px'; d.style.background = a ? 'var(--p)' : 'var(--line)'; d.setAttribute('aria-current', a ? 'true' : 'false'); });
     const goTo = (i, animate) => {
       cur = wrap(i); const x = -cur * width();
       if (g && !self.reduceMotion() && animate !== false) g.to(track, { x: x, duration: 0.45, ease: 'power3.out', overwrite: 'auto' });
@@ -380,9 +390,14 @@ class Component extends DCLogic {
     };
     const stopAuto = () => { if (self._homeHeroTimer) { clearInterval(self._homeHeroTimer); self._homeHeroTimer = null; } };
     const startAuto = () => { stopAuto(); if (self.reduceMotion() || N < 2) return; self._homeHeroTimer = setInterval(() => goTo(cur + 1, true), 5000); };
-    dots.forEach((d, i) => { d.onclick = () => { goTo(i, true); startAuto(); }; });
+    this.wireDots(dots, (i) => { goTo(i, true); startAuto(); });
     goTo(0, false);
     startAuto();
+    // WCAG 2.2.2: auto-advance pauses while the carousel is hovered or holds keyboard focus
+    viewport.addEventListener('pointerenter', stopAuto);
+    viewport.addEventListener('pointerleave', startAuto);
+    track.addEventListener('focusin', stopAuto);
+    track.addEventListener('focusout', startAuto);
     if (this._gsapReady && window.Draggable) {
       this._homeHeroDrag = window.Draggable.create(track, {
         type: 'x', inertia: !!window.InertiaPlugin, dragClickables: true, cursor: 'grab', activeCursor: 'grabbing',
@@ -617,7 +632,22 @@ class Component extends DCLogic {
   toast(msg) {
     clearTimeout(this._toastT);
     this.setState({ toastMsg: msg, toastShow: true });
-    this._toastT = setTimeout(() => this.setState({ toastShow: false }), 2400);
+    this.announce(msg);
+    this._toastT = setTimeout(() => this.setState({ toastShow: false }), 3200);
+  }
+  // One persistent, visually-hidden polite live region (created once). A role=status node that is
+  // mounted together with its text (the old toast) is skipped by many screen readers.
+  announce(msg) {
+    let el = this._liveEl;
+    if (!el || !el.isConnected) {
+      el = this._liveEl = document.createElement('div');
+      el.setAttribute('role', 'status'); el.setAttribute('aria-live', 'polite');
+      el.style.cssText = 'position:absolute;width:1px;height:1px;margin:-1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap';
+      document.body.appendChild(el);
+    }
+    el.textContent = '';
+    clearTimeout(this._liveT);
+    this._liveT = setTimeout(() => { el.textContent = msg; }, 60);
   }
 
   DEPTH = { home:0, products:0, services:0, cart:0, profile:0, detail:1, checkout:1, auth:1, refill:1, usedSale:1, orders:1, requests:1, inquiries:1, addresses:1, wishlist:1, orderDetail:2, requestDetail:2, success:2, formSuccess:2 };
@@ -937,7 +967,7 @@ class Component extends DCLogic {
   vm(p) {
     const show = this.showPrice(p);
     return {
-      id: p.id, title: p.title, isNew: !!p.new,
+      id: p.id, title: p.title.replace(/([۰-۹]+) /g, '$1\u00a0'), isNew: !!p.new,
       meta: p.gas + ' · ' + this.catLabel(p.cat),
       hasPrice: show, inquiry: !show,
       priceLabel: show ? this.fmt(p.price) : '',
@@ -1169,7 +1199,7 @@ class Component extends DCLogic {
       label: c.label,
       pick: () => this.vtState({ cat: c.id }),
       style: chipBase + (s.cat === c.id
-        ? 'border:1px solid var(--p);background:var(--p-soft);color:var(--p)'
+        ? 'border:1px solid var(--p);background:var(--p-soft);color:var(--p-ink)'
         : 'border:1px solid var(--line);background:var(--sur);color:var(--tx2)')
     }));
 
@@ -1177,7 +1207,7 @@ class Component extends DCLogic {
       label: g,
       pick: () => this.setState({ rfGas: g, rfErrs: { ...s.rfErrs, gas: '' } }),
       style: chipBase + (s.rfGas === g
-        ? 'border:1px solid var(--p);background:var(--p-soft);color:var(--p)'
+        ? 'border:1px solid var(--p);background:var(--p-soft);color:var(--p-ink)'
         : 'border:1px solid var(--line);background:var(--sur);color:var(--tx2)')
     }));
 
@@ -1276,7 +1306,7 @@ class Component extends DCLogic {
     const navPillStyle = 'position:absolute;top:6px;bottom:calc(6px + env(safe-area-inset-bottom));inset-inline-start:calc(8px + ' + pillIdx + ' * (100% - 16px) / 5);width:calc((100% - 16px) / 5);background:var(--p-soft);border-radius:14px;pointer-events:none;z-index:0;transition:inset-inline-start .34s var(--ease-emphasized)';
     const navs = navDefs.map(n => ({
       ...n,
-      style: navBase + (n.key === activeKey ? 'color:var(--p);font-weight:800' : 'color:var(--tx2)'),
+      style: navBase + (n.key === activeKey ? 'color:var(--p-ink);font-weight:800' : 'color:var(--tx2)'),
       current: n.key === activeKey ? 'page' : 'false',   // aria-current on the active tab (a11y)
       showBadge: n.key === 'cart' && t.count > 0,
       badge: this.fmt(t.count)
@@ -1284,7 +1314,7 @@ class Component extends DCLogic {
 
     const reqChip = (kind) => kind === 'warn'
       ? 'font-size:10.5px;font-weight:700;color:var(--warn);background:var(--warn-soft);padding:4px 12px;border-radius:999px'
-      : 'font-size:10.5px;font-weight:700;color:var(--p);background:var(--p-soft);padding:4px 12px;border-radius:999px';
+      : 'font-size:10.5px;font-weight:700;color:var(--p-ink);background:var(--p-soft);padding:4px 12px;border-radius:999px';
 
     const menuRows = [
       { label: 'سفارش‌های من', d: 'M4 7h16l-1.5 13h-13L4 7zM8 7a4 4 0 0 1 8 0', go: () => this.go({ route: 'orders' }), count: this.fmt(s.orders.length), hasCount: s.orders.length > 0 },
@@ -1312,6 +1342,7 @@ class Component extends DCLogic {
       isAddresses: route === 'addresses', isWishlist: route === 'wishlist',
       isDark: dark, isLight: !dark, isLogged: logged, isGuest: !logged,
       toggleTheme: (e) => this.themeVT(e, dark ? 'light' : 'dark'),
+      themeLabel: dark ? 'تغییر به حالت روشن' : 'تغییر به حالت تاریک', themeDarkStr: dark ? 'true' : 'false',
       goHome: () => this.go({ route: 'home' }),
       // Back from detail reverse-morphs the hero into its originating card thumbnail (M3); off the
       // detail route [data-hero-img] is absent so morphTo falls back to the plain back cover-slide.
@@ -1355,7 +1386,7 @@ class Component extends DCLogic {
       closeSheet: () => this.setState({ sheet: false }),
       stockSwitchStyle: 'display:inline-block;width:44px;height:26px;border-radius:var(--r-pill);position:relative;transition:background .2s;background:' + (s.inStock ? 'var(--p)' : 'var(--line)'),
       stockKnobStyle: 'position:absolute;top:3px;width:20px;height:20px;border-radius:var(--r-pill);background:#fff;transition:inset-inline-start .2s;inset-inline-start:' + (s.inStock ? '21px' : '3px'),
-      themeSwitchStyle: 'display:inline-block;width:44px;height:26px;border-radius:var(--r-pill);position:relative;transition:background .2s;cursor:pointer;background:' + (dark ? 'var(--p)' : 'var(--line)'),
+      themeSwitchStyle: 'display:inline-block;flex:none;border:none;padding:0;width:44px;height:26px;border-radius:var(--r-pill);position:relative;transition:background .2s;cursor:pointer;background:' + (dark ? 'var(--p)' : 'var(--line)'),
       themeKnobStyle: 'position:absolute;top:3px;width:20px;height:20px;border-radius:var(--r-pill);background:#fff;transition:inset-inline-start .2s;inset-inline-start:' + (dark ? '21px' : '3px'),
 
       cur: curVm,
