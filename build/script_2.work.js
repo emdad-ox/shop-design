@@ -3,7 +3,6 @@ class Component extends DCLogic {
   state = {
     route: 'home', theme: null, pid: null, qty: 1, cart: {}, wish: {},
     cat: 'all', q: '', inStock: false, sort: 'new', sheet: false,
-    inqSheet: false, inqPid: null,
     contactOpen: false, rfTimeOpen: false,   // notes 13-Nov: contact sheet (#9/#10), refill delivery-time sheet (#8)
     authFirst: '', authLast: '',             // notes 13-Nov #13: login collects first + last name
     disc: null, discInput: '', discErr: '',
@@ -22,7 +21,9 @@ class Component extends DCLogic {
     resendIn: 0, authReturn: null, authFrom: 'profile', pendingSubmit: null,
     editingName: false, nameInput: '',
     // records
-    orders: [], requests: [], inquiries: [], busy: '',
+    orders: [], requests: [], busy: '',
+    // payment (online, simulated gateway) — transient: never persisted; cleared after pay/cancel
+    payCard: '', payCvv: '', payMonth: '', payYear: '', payPin: '', payPinSent: '', payErr: '',
     // delivery scheduling (P7)
     coDay: 0, coSlot: '',
     // refill form
@@ -44,8 +45,8 @@ class Component extends DCLogic {
     { id:'oxy5', title:'کپسول اکسیژن ۵ لیتری پرتابل', cat:'cyl', gas:'اکسیژن طبی', price:2150000, vis:true, stock:4, new:true,
       desc:'کپسول پرتابل ۵ لیتری همراه کیف حمل؛ مناسب جابه‌جایی بیمار و سفر. قابلیت شارژ سریع در محل مجموعه.',
       specs:[['حجم','۵ لیتر'],['فشار کاری','۱۵۰ بار'],['وزن تقریبی','۷ کیلوگرم'],['کیف حمل','دارد']] },
-    { id:'conc', title:'دستگاه اکسیژن‌ساز ۵ لیتری', cat:'dev', gas:'اکسیژن‌ساز خانگی', price:0, vis:false, stock:3,
-      desc:'اکسیژن‌ساز خانگی با خروجی ۵ لیتر در دقیقه و غلظت اکسیژن تا ۹۳٪؛ دارای نبولایزر داخلی و هشدار افت غلظت. قیمت با استعلام اعلام می‌شود.',
+    { id:'conc', title:'دستگاه اکسیژن‌ساز ۵ لیتری', cat:'dev', gas:'اکسیژن‌ساز خانگی', price:32500000, vis:true, stock:3,   // TODO(content): demo price — confirm the real price
+      desc:'اکسیژن‌ساز خانگی با خروجی ۵ لیتر در دقیقه و غلظت اکسیژن تا ۹۳٪؛ دارای نبولایزر داخلی و هشدار افت غلظت.',
       specs:[['خروجی','۵ لیتر بر دقیقه'],['غلظت اکسیژن','تا ۹۳٪'],['سطح صدا','≤ ۴۵ دسی‌بل'],['گارانتی','۱۸ ماه']] },
     { id:'mano', title:'مانومتر اکسیژن طبی', cat:'acc', gas:'اکسیژن طبی', price:850000, vis:true, stock:25,
       desc:'مانومتر دو گیج با فلومتر و مرطوب‌کننده؛ سازگار با کپسول‌های استاندارد اکسیژن طبی.',
@@ -53,8 +54,8 @@ class Component extends DCLogic {
     { id:'mask', title:'ماسک اکسیژن بزرگسال', cat:'acc', gas:'مصرفی تنفسی', price:95000, vis:true, stock:60,
       desc:'ماسک اکسیژن بزرگسال با کش تنظیم و لوله ۲ متری؛ یک‌بارمصرف بهداشتی.',
       specs:[['سایز','بزرگسال'],['طول لوله','۲ متر'],['نوع','یک‌بارمصرف']] },
-    { id:'co2', title:'کپسول CO₂ صنعتی ۲۰ لیتری', cat:'cyl', gas:'دی‌اکسید کربن', price:0, vis:false, stock:8,
-      desc:'کپسول دی‌اکسید کربن صنعتی ۲۰ لیتری مناسب صنایع غذایی و جوشکاری؛ قیمت روز با استعلام اعلام می‌شود.',
+    { id:'co2', title:'کپسول CO₂ صنعتی ۲۰ لیتری', cat:'cyl', gas:'دی‌اکسید کربن', price:1850000, vis:true, stock:8,   // TODO(content): demo price — confirm the real price
+      desc:'کپسول دی‌اکسید کربن صنعتی ۲۰ لیتری مناسب صنایع غذایی و جوشکاری.',
       specs:[['حجم','۲۰ لیتر'],['کاربرد','صنعتی / غذایی'],['وضعیت تحویل','پر و پلمب']] },
     { id:'nebu', title:'نبولایزر قابل حمل', cat:'dev', gas:'تجهیزات تنفسی', price:1780000, vis:true, stock:0, new:true,
       desc:'نبولایزر کمپرسوری قابل حمل با ماسک بزرگسال و کودک؛ مناسب داروهای استنشاقی.',
@@ -73,7 +74,7 @@ class Component extends DCLogic {
 
   STORE_KEY = 'emdad:v1';
   SCHEMA_V = 2;
-  DURABLE = ['cart','wish','addresses','nextAddrId','orders','requests','inquiries','loggedIn','userName','phone','addrId','theme'];
+  DURABLE = ['cart','wish','addresses','nextAddrId','orders','requests','loggedIn','userName','phone','addrId','theme'];
   ART_OF = { oxy40:'cyl', oxy10:'cyl', oxy5:'cyl', co2:'cyl', conc:'dev', nebu:'dev', mano:'mano', mask:'mask' };
   PRODUCT_ART = {
     cyl: '<svg viewBox="0 0 96 96" width="56%" height="56%" fill="none" stroke="currentColor" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"><rect x="32" y="26" width="32" height="58" rx="16" fill="currentColor" fill-opacity=".1"/><path d="M43 26v-5a5 5 0 0 1 10 0v5"/><rect x="41" y="12" width="14" height="8" rx="2" fill="currentColor" fill-opacity=".1"/><path d="M32 44h32M32 68h32"/></svg>',
@@ -103,11 +104,12 @@ class Component extends DCLogic {
     try { history.replaceState({ eoRoute: this.state.route, pid: this.state.pid }, ''); } catch (e) {}
     this._lastRoute = this.state.route; this._lastOverlay = false;
     this._onPop = (e) => {
-      if (this.state.sheet || this.state.addrSheet || this.state.inqSheet || this.state.contactOpen || this.state.rfTimeOpen) { this._navSource = 'pop'; this.closeOverlays(); return; }
+      if (this.state.sheet || this.state.addrSheet || this.state.contactOpen || this.state.rfTimeOpen) { this._navSource = 'pop'; this.closeOverlays(); return; }
       const st = e.state || {};
       this._navSource = 'pop';
       let to = st.eoRoute || 'home';
-      if (to === 'checkout' && !this.cartTotals().count) to = 'cart';
+      if ((to === 'checkout' || to === 'payment') && !this.cartTotals().count) to = 'cart';
+      if (this.state.route === 'payment' && to !== 'payment') this.setState(this.PAY_RESET);
       if (to === 'auth' && this.state.loggedIn) to = this.state.authFrom || 'profile';
       this.go({ route: to, pid: st.pid });
     };
@@ -178,7 +180,7 @@ class Component extends DCLogic {
     }
     // Opening a bottom-sheet pushes a disposable history entry so hardware Back closes the sheet
     // instead of leaving the route (P3 overlay layer).
-    const ovNow = !!(this.state.sheet || this.state.addrSheet || this.state.inqSheet || this.state.contactOpen || this.state.rfTimeOpen);
+    const ovNow = !!(this.state.sheet || this.state.addrSheet || this.state.contactOpen || this.state.rfTimeOpen);
     if (ovNow && !this._lastOverlay && this._navSource !== 'pop') { try { history.pushState({ eoRoute: this.state.route, pid: this.state.pid, overlay: true }, ''); } catch (e) {} }
     this._lastOverlay = ovNow;
     this._lastRoute = this.state.route;
@@ -571,7 +573,6 @@ class Component extends DCLogic {
     order:   ['ثبت سفارش', 'در حال آماده‌سازی', 'ارسال شد', 'تحویل شد'],
     refill:  ['ثبت درخواست', 'جمع‌آوری کپسول', 'در حال شارژ', 'تحویل شد'],
     used:    ['ثبت درخواست', 'در حال بررسی', 'قیمت‌گذاری', 'تکمیل شد'],
-    inquiry: ['ثبت استعلام', 'در حال بررسی', 'قیمت‌گذاری', 'اعلام قیمت'],
   };
   // Demo-paced fulfilment: a fresh record sits at stage 1, then advances over real elapsed
   // time (persisted ts keeps progressing across reloads). Clamped to the final stage.
@@ -601,6 +602,11 @@ class Component extends DCLogic {
     if (!o) return {};
     const st = this.stepperVM('order', o.ts);
     return {
+      odInvTitle: o.paid ? 'فاکتور پرداخت‌شده —' : 'پیش‌فاکتور —',
+      odInvNote: o.paid ? 'مبلغ به‌صورت آنلاین پرداخت شد (کارت \u2066' + o.payCard + '\u2069). زمان تحویل را همکاران ما هماهنگ می‌کنند.' : 'پرداخت آنلاین انجام نشده و مبلغ نهایی و زمان تحویل هنگام تماس همکاران ما تأیید می‌شود.',
+      odInvBg: o.paid ? 'var(--ok-soft)' : 'var(--warn-soft)',
+      odInvBorder: o.paid ? 'color-mix(in oklab, var(--ok) 30%, var(--line))' : 'color-mix(in oklab, var(--warn) 30%, var(--line))',
+      odPayLine: o.payRef ? 'پرداخت آنلاین موفق · کد پیگیری ' + this.fmtDigits(o.payRef) : 'پیامک تأیید برای شما ارسال شد',
       odNo: o.no, odDate: o.date, odDelivery: o.delivery || 'هماهنگی تلفنی',
       odItems: (o.items || []).map(it => ({ title: it.title, qtyFa: this.fmt(it.qty), lineLabel: this.fmt(it.line) })),
       odSubtotalLabel: this.fmt(o.subtotal != null ? o.subtotal : o.total),
@@ -628,14 +634,14 @@ class Component extends DCLogic {
 
   // ======================================================================================
   // JSON DB (db.json) — every login / signup / logout, cart, wishlist, address, order,
-  // service request, price inquiry, profile edit and catalog search is written to db.json
+  // service request, payment, profile edit and catalog search is written to db.json
   // through server.js (`npm start`). Writes are also mirrored in the browser (localStorage
   // `emdad:db`, same schema) so the app behaves identically when no server is reachable
   // (GitHub Pages, file://). Inspect from the console: window.emdadDB.dump() / .online().
   // ======================================================================================
   DB_API = '/api';
   DB_LOCAL = 'emdad:db';
-  DB_COLS = ['users','sessions','carts','wishlists','addressBooks','orders','serviceRequests','priceInquiries','activity'];
+  DB_COLS = ['users','sessions','carts','wishlists','addressBooks','orders','payments','serviceRequests','activity'];
   deviceId() {
     if (this._devId) return this._devId;
     let id = null;
@@ -696,7 +702,7 @@ class Component extends DCLogic {
     const s = this.state;
     return {
       owner: this.dbOwner(), cart: JSON.stringify(s.cart), wish: JSON.stringify(s.wish), addr: JSON.stringify(s.addresses),
-      orders: new Set(s.orders.map(o => o.no)), requests: new Set(s.requests.map(r => r.code)), inquiries: new Set(s.inquiries.map(q => q.code)),
+      orders: new Set(s.orders.map(o => o.no)), requests: new Set(s.requests.map(r => r.code)),
       name: s.userName, theme: this.theme(), q: s.q, cat: s.cat,
     };
   }
@@ -722,15 +728,15 @@ class Component extends DCLogic {
     }
     s.orders.filter(o => !prev.orders.has(o.no)).forEach(o => {
       this.dbWrite('POST', 'orders', null, { ...o, id: o.no, userId, phone: s.phone, customer: s.userName });
+      if (o.payRef) {
+        this.dbWrite('POST', 'payments', null, { id: o.payRef, orderNo: o.no, userId, amount: o.total, currency: 'IRT', method: 'online', status: 'paid', cardMasked: o.payCard, at: new Date(o.ts).toISOString() });
+        this.dbLog('payment.success', { orderNo: o.no, ref: o.payRef, amount: o.total });
+      }
       this.dbLog('order.place', { no: o.no, total: o.total });
     });
     s.requests.filter(r => !prev.requests.has(r.code)).forEach(r => {
       this.dbWrite('POST', 'serviceRequests', null, { ...r, id: r.code, userId, phone: s.phone, customer: s.userName });
       this.dbLog('service.request', { code: r.code, kind: r.kind });
-    });
-    s.inquiries.filter(q => !prev.inquiries.has(q.code)).forEach(q => {
-      this.dbWrite('POST', 'priceInquiries', null, { ...q, id: q.code, userId, customer: s.userName });
-      this.dbLog('price.inquiry', { code: q.code, pid: q.pid });
     });
     if (s.loggedIn && userId && now.name !== prev.name && prev.owner === owner) {
       this.dbWrite('PATCH', 'users', userId, { name: s.userName });
@@ -801,7 +807,7 @@ class Component extends DCLogic {
       + ';box-shadow:var(--shadow);opacity:' + (busy ? '.72' : '1');
   }
   validPhone(s) { const d = this.deFa(s); return /^(0|98|098|0098)?9\d{9}$/.test(d); }
-  showPrice(p) { return (this.props.showPrices ?? true) && p.vis; }
+  showPrice(p) { return (this.props.showPrices ?? true) && p.price > 0; }   // every product is priced (no price inquiries)
   catLabel(id) { const c = this.CATS.find(c => c.id === id); return c ? c.label : ''; }
 
   toast(msg) {
@@ -826,9 +832,9 @@ class Component extends DCLogic {
     this._liveT = setTimeout(() => { el.textContent = msg; }, 60);
   }
 
-  DEPTH = { home:0, products:0, services:0, cart:0, profile:0, detail:1, checkout:1, auth:1, refill:1, usedSale:1, orders:1, requests:1, inquiries:1, addresses:1, wishlist:1, orderDetail:2, requestDetail:2, success:2, formSuccess:2 };
+  DEPTH = { home:0, products:0, services:0, cart:0, profile:0, detail:1, checkout:1, payment:2, auth:1, refill:1, usedSale:1, orders:1, requests:1, addresses:1, wishlist:1, orderDetail:2, requestDetail:2, success:2, formSuccess:2 };
   TAB_ORDER = ['home', 'products', 'services', 'cart', 'profile'];
-  ROUTE_TAB = { home:'home', products:'products', detail:'products', cart:'cart', checkout:'cart', success:'cart', services:'services', refill:'services', usedSale:'services', formSuccess:'services', profile:'profile', orders:'profile', requests:'profile', inquiries:'profile', orderDetail:'profile', requestDetail:'profile', addresses:'profile', wishlist:'profile', auth:'profile' };
+  ROUTE_TAB = { home:'home', products:'products', detail:'products', cart:'cart', checkout:'cart', payment:'cart', success:'cart', services:'services', refill:'services', usedSale:'services', formSuccess:'services', profile:'profile', orders:'profile', requests:'profile', orderDetail:'profile', requestDetail:'profile', addresses:'profile', wishlist:'profile', auth:'profile' };
   tabOf(route) { return this.ROUTE_TAB[route] || 'home'; }
   // Wrap a route change in a directional View Transition (SPA equivalent of @view-transition).
   nav(patch, dir) {
@@ -1063,7 +1069,6 @@ class Component extends DCLogic {
   closeOverlays() {
     const s = this.state;
     if (s.addrSheet) this.setState({ addrSheet: null, addrSheetTarget: null });
-    else if (s.inqSheet) this.setState({ inqSheet: false, inqPid: null });
     else if (s.contactOpen) this.setState({ contactOpen: false });
     else if (s.rfTimeOpen) this.setState({ rfTimeOpen: false });
     else if (s.sheet) this.setState({ sheet: false });
@@ -1147,13 +1152,12 @@ class Component extends DCLogic {
     return {
       id: p.id, title: p.title.replace(/([۰-۹]+) /g, '$1\u00a0'), isNew: !!p.new,
       meta: p.gas + ' · ' + this.catLabel(p.cat),
-      hasPrice: show, inquiry: !show,
+      hasPrice: show,
       priceLabel: show ? this.fmt(p.price) : '',
       out: p.stock <= 0,
       canAdd: show && p.stock > 0,
       open: (e) => this.openMorph(p.id, e),
       add: (e) => { if (e && e.stopPropagation) e.stopPropagation(); if (p.stock > 0) { const c = e && e.currentTarget && e.currentTarget.closest('[data-pid]'); this.addToCart(p.id, 1, c && c.firstElementChild); } },
-      inquire: (e) => { if (e && e.stopPropagation) e.stopPropagation(); this.setState({ inqSheet: true, inqPid: p.id }); },
       unwish: (e) => { if (e && e.stopPropagation) e.stopPropagation(); const w = { ...this.state.wish }; delete w[p.id]; this.vtState({ wish: w }); }
     };
   }
@@ -1197,7 +1201,6 @@ class Component extends DCLogic {
       this.toast('با موفقیت وارد شدید');
       if (pending === 'refill') this.completeRefill();
       else if (pending === 'used') this.completeUsed();
-      else if (pending === 'inquiry') this.confirmInquiry();
       else this.go({ route: this.state.authReturn || 'profile' });
     });
   };
@@ -1222,25 +1225,6 @@ class Component extends DCLogic {
       usPhotoList: [], usPrice: '', usDesc: '', usErrs: {}
     });
   }
-  // Price-inquiry confirm→commit: the detail CTA opens a confirm sheet (state.inqSheet); confirming
-  // here records the inquiry (like a refill/used request) and lands on the shared formSuccess screen.
-  // No instant submit anywhere — the card opens detail, detail opens this sheet.
-  confirmInquiry = () => {
-    const p = this.PRODUCTS.find(x => x.id === this.state.inqPid);
-    if (!p) { this.setState({ inqSheet: false, inqPid: null }); return; }
-    if (!this.state.loggedIn) {
-      this.setState({ inqSheet: false });
-      this.goAuthFor('detail', 'detail', 'inquiry');
-      this.toast('برای تماس کارشناس، شماره موبایل خود را تأیید کنید');
-      return;
-    }
-    if (!this.commitGuard()) return;
-    const c = this.code('IQ');
-    this.go({
-      inquiries: [{ pid: p.id, title: p.title, code: c, date: this.todayFa(), ts: Date.now(), phone: this.state.phone }, ...this.state.inquiries],
-      route: 'formSuccess', fsKind: 'inquiry', fsCode: c, inqSheet: false, inqPid: null, busy: ''
-    });
-  };
   submitRefill = () => {
     if (this.state.busy) return;
     const s = this.state, errs = {};
@@ -1320,12 +1304,52 @@ class Component extends DCLogic {
     }
   };
 
+  // Checkout CTA → the payment page. The order is created ONLY after a successful online payment.
   placeOrder = () => {
     if (this.state.busy) return;
     if (!this.cartTotals().count) { this.go({ route: 'cart' }); return; }
     if (!this.commitGuard()) return;
-    this.setState({ busy: 'order' });                 // show loading, then commit (simulated server round-trip)
-    this._busyT = setTimeout(() => this._commitOrder(), 850);
+    this.go({ route: 'payment', ...this.PAY_RESET });
+    this.dbLog('payment.start', { amount: this.cartTotals().total });
+  };
+  // ---------- payment (simulated online gateway; no real money) ----------
+  // Card data stays in transient state only and is wiped after pay/cancel; orders and db.json keep
+  // just the masked card number and the tracking code.
+  PAY_RESET = { payCard: '', payCvv: '', payMonth: '', payYear: '', payPin: '', payPinSent: '', payErr: '' };
+  luhnOk(d) { let sum = 0; for (let i = 0; i < d.length; i++) { let n = +d[d.length - 1 - i]; if (i % 2) { n *= 2; if (n > 9) n -= 9; } sum += n; } return sum % 10 === 0; }
+  cardDigits() { return this.deFa(this.state.payCard).replace(/\D/g, ''); }
+  maskCard(d) { return d.slice(0, 4) + ' ' + d.slice(4, 6) + '** **** ' + d.slice(-4); }
+  payRequestPin = () => {
+    const d = this.cardDigits();
+    if (d.length !== 16 || !this.luhnOk(d)) { this.setState({ payErr: 'ابتدا شماره کارت ۱۶ رقمی معتبر را وارد کنید' }); return; }
+    const pin = String(Math.floor(100000 + Math.random() * 900000));
+    this.setState({ payPinSent: pin, payErr: '' });
+    this.toast('رمز پویا (آزمایشی): ' + this.fmtDigits(pin));
+  };
+  fmtDigits(x) { return String(x).replace(/\d/g, c => '۰۱۲۳۴۵۶۷۸۹'[c]); }
+  paySubmit = () => {
+    const s = this.state;
+    if (s.busy) return;
+    if (!this.cartTotals().count) { this.go({ route: 'cart', ...this.PAY_RESET }); return; }
+    const d = this.cardDigits(), cvv = this.deFa(s.payCvv).replace(/\D/g, ''), mm = +this.deFa(s.payMonth), yy = this.deFa(s.payYear).replace(/\D/g, '');
+    const pin = this.deFa(s.payPin).replace(/\D/g, '');
+    let err = '';
+    if (d.length !== 16 || !this.luhnOk(d)) err = 'شماره کارت معتبر نیست';
+    else if (cvv.length < 3 || cvv.length > 4) err = 'CVV2 را درست وارد کنید (۳ یا ۴ رقم)';
+    else if (!(mm >= 1 && mm <= 12) || yy.length !== 2) err = 'تاریخ انقضا را درست وارد کنید';
+    else if (!s.payPinSent) err = 'ابتدا «دریافت رمز پویا» را بزنید';
+    else if (pin !== s.payPinSent) err = 'رمز پویا نادرست است';
+    if (err) { this.setState({ payErr: err }); this.dbLog('payment.error', { reason: err }); return; }
+    if (!this.commitGuard()) return;
+    this._pendingPay = { payRef: String(Math.floor(1e11 + Math.random() * 9e11)), payCard: this.maskCard(d), paidAt: Date.now() };
+    this.setState({ busy: 'order', payErr: '' });            // simulated bank round-trip, then commit the order
+    this._busyT = setTimeout(() => this._commitOrder(), 1200);
+  };
+  payCancel = () => {
+    if (this.state.busy) return;
+    this.dbLog('payment.cancel', { amount: this.cartTotals().total });
+    this.go({ route: 'checkout', ...this.PAY_RESET });
+    this.toast('پرداخت لغو شد — سفارشی ثبت نشد');
   };
   _commitOrder() {
     if (this.state.busy !== 'order') return;
@@ -1342,12 +1366,14 @@ class Component extends DCLogic {
       no, date: this.todayFa(), ts: Date.now(), count: t.count,
       subtotal: t.subtotal, disc: t.disc, discCode: s.disc || '', total: t.total,
       items, note: s.note || '', addrTitle: addr ? addr.title : '', addrText: addr ? addr.text : '',
-      delivery: this.deliveryOrPhone(s.coDay, s.coSlot)
+      delivery: this.deliveryOrPhone(s.coDay, s.coSlot),
+      ...(this._pendingPay ? { paid: true, payMethod: 'online', ...this._pendingPay } : {})
     };
+    this._pendingPay = null;
     // Land on the itemized order-detail page (odFresh → shows the success moment), NOT the orders list.
     this.go({
       route: 'orderDetail', odId: no, odFresh: true, orderNo: no,
-      cart: {}, disc: null, discInput: '', note: '', busy: '', coSlot: '', coDay: 0,
+      cart: {}, disc: null, discInput: '', note: '', busy: '', coSlot: '', coDay: 0, ...this.PAY_RESET,
       orders: [order, ...s.orders]
     });
   }
@@ -1484,9 +1510,9 @@ class Component extends DCLogic {
     ];
     const activeMap = {
       home: 'home', products: 'products', detail: 'products',
-      cart: 'cart', checkout: 'cart', success: 'cart',
+      cart: 'cart', checkout: 'cart', payment: 'cart', success: 'cart',
       services: 'services', refill: 'services', usedSale: 'services', formSuccess: 'services',
-      profile: 'profile', orders: 'profile', requests: 'profile', inquiries: 'profile', orderDetail: 'profile', requestDetail: 'profile', addresses: 'profile', wishlist: 'profile', auth: 'profile'
+      profile: 'profile', orders: 'profile', requests: 'profile', orderDetail: 'profile', requestDetail: 'profile', addresses: 'profile', wishlist: 'profile', auth: 'profile'
     };
     const activeKey = route === 'auth' ? (activeMap[s.authFrom] || 'profile') : (activeMap[route] || 'home');
     const pillIdx = Math.max(0, this.TAB_ORDER.indexOf(activeKey));
@@ -1506,7 +1532,6 @@ class Component extends DCLogic {
     const menuRows = [
       { label: 'سفارش‌های من', d: 'M4 7h16l-1.5 13h-13L4 7zM8 7a4 4 0 0 1 8 0', go: () => this.go({ route: 'orders' }), count: this.fmt(s.orders.length), hasCount: s.orders.length > 0 },
       { label: 'درخواست‌های خدمت', d: 'M9 3h6M12 3v4M8 7h8v13a1 1 0 0 1-1 1H9a1 1 0 0 1-1-1z', go: () => this.go({ route: 'requests' }), count: this.fmt(s.requests.length), hasCount: s.requests.length > 0 },
-      { label: 'استعلام‌های قیمت', d: 'M11 4a7 7 0 1 0 0 14 7 7 0 0 0 0-14zM20 21l-4.35-4.35', go: () => this.go({ route: 'inquiries' }), count: this.fmt(s.inquiries.length), hasCount: s.inquiries.length > 0 },
       { label: 'علاقه‌مندی‌ها', d: 'M12 20.5s-7.2-4.6-9.3-8.4C1 9.1 2.7 6.2 5.7 5.8c1.9-.3 3.5.6 4.4 2h3.8c.9-1.4 2.5-2.3 4.4-2 3 .4 4.7 3.3 3 6.3-2.1 3.8-9.3 8.4-9.3 8.4z', go: () => this.go({ route: 'wishlist' }), count: this.fmt(Object.keys(s.wish).length), hasCount: Object.keys(s.wish).length > 0 },
       { label: 'آدرس‌های من', d: 'M12 21s-7-5.3-7-11a7 7 0 0 1 14 0c0 5.7-7 11-7 11zM12 12.5a2.5 2.5 0 1 0 0-5 2.5 2.5 0 0 0 0 5z', go: () => this.go({ route: 'addresses' }), count: this.fmt(s.addresses.length), hasCount: true }
     ];
@@ -1515,7 +1540,7 @@ class Component extends DCLogic {
     const price = parseInt(this.deFa(s.usPrice) || '0', 10);
     // Support FAB: lift it above the full-width fixed bottom CTA on screens that have one, so the
     // two never overlap; otherwise it rests just above the bottom nav.
-    const hasBottomCta = (route === 'cart' && t.count > 0) || route === 'checkout' || (route === 'detail' && (curVm.canAdd || curVm.out)) || route === 'refill' || route === 'usedSale' || route === 'services';
+    const hasBottomCta = (route === 'cart' && t.count > 0) || route === 'checkout' || route === 'payment' || (route === 'detail' && (curVm.canAdd || curVm.out)) || route === 'refill' || route === 'usedSale' || route === 'services';
     // Support pill shows only on the three browse pages (no bottom CTA to compete with); hidden elsewhere.
     const showFab = route === 'home' || route === 'products' || route === 'profile';
     const fabStyle = 'border:none;cursor:pointer;font-family:inherit;position:fixed;z-index:45;inset-inline-end:16px;bottom:calc(' + (hasBottomCta ? '150px' : '86px') + ' + env(safe-area-inset-bottom));height:46px;padding:0 15px;border-radius:999px;background:var(--grad-cta);color:#fff;display:inline-flex;align-items:center;gap:8px;box-shadow:0 12px 26px -6px var(--glow);text-decoration:none;font-size:12px;font-weight:600;white-space:nowrap' + (showFab ? '' : ';display:none');
@@ -1528,7 +1553,7 @@ class Component extends DCLogic {
       isCart: route === 'cart', isCheckout: route === 'checkout', isSuccess: route === 'success',
       isAuth: route === 'auth', isServices: route === 'services', isRefill: route === 'refill',
       isUsed: route === 'usedSale', isFormSuccess: route === 'formSuccess',
-      isProfile: route === 'profile', isOrders: route === 'orders', isRequests: route === 'requests', isInquiries: route === 'inquiries',
+      isProfile: route === 'profile', isOrders: route === 'orders', isRequests: route === 'requests',
       isAddresses: route === 'addresses', isWishlist: route === 'wishlist',
       isDark: dark, isLight: !dark, isLogged: logged, isGuest: !logged,
       toggleTheme: (e) => this.themeVT(e, dark ? 'light' : 'dark'),
@@ -1549,11 +1574,6 @@ class Component extends DCLogic {
       goProfile: () => this.go({ route: 'profile' }),
       goOrders: () => this.go({ route: 'orders' }),
       goRequests: () => this.go({ route: 'requests' }),
-      goInquiries: () => this.go({ route: 'inquiries' }),
-      inqSheetOpen: s.inqSheet,
-      inqProductTitle: (this.PRODUCTS.find(p => p.id === s.inqPid) || {}).title || '',
-      closeInqSheet: () => this.setState({ inqSheet: false, inqPid: null }),
-      confirmInquiry: this.confirmInquiry,
       goCheckout: () => {
         if (!logged) { this.goAuthFor('checkout', 'cart'); this.toast('برای ثبت سفارش ابتدا وارد شوید'); }
         else this.go({ route: 'checkout' });
@@ -1642,8 +1662,20 @@ class Component extends DCLogic {
       placeOrder: this.placeOrder,
       // busy-aware submit CTAs (P6 loading states)
       busyOrder: s.busy === 'order', busyRefill: s.busy === 'refill', busyUsed: s.busy === 'used',
-      placeBtnLabel: s.busy === 'order' ? 'در حال ثبت سفارش…' : 'ثبت نهایی سفارش',
-      placeBtnStyle: this.ctaStyle('var(--p)', '#fff', s.busy === 'order'),
+      placeBtnLabel: 'ادامه و پرداخت',
+      placeBtnStyle: this.ctaStyle('var(--p)', '#fff', false),
+      // payment page
+      isPayment: route === 'payment', busyPay: s.busy === 'order',
+      payAmountLabel: this.fmt(t.total), payItemsLabel: this.fmt(t.count) + ' کالا · سفارش امداد اکسیژن',
+      payCard: s.payCard, onPayCard: (e) => this.setState({ payCard: e.target.value, payErr: '' }),
+      payCvv: s.payCvv, onPayCvv: (e) => this.setState({ payCvv: e.target.value, payErr: '' }),
+      payMonth: s.payMonth, onPayMonth: (e) => this.setState({ payMonth: e.target.value, payErr: '' }),
+      payYear: s.payYear, onPayYear: (e) => this.setState({ payYear: e.target.value, payErr: '' }),
+      payPin: s.payPin, onPayPin: (e) => this.setState({ payPin: e.target.value, payErr: '' }),
+      payErr: s.payErr, payRequestPin: this.payRequestPin, paySubmit: this.paySubmit, payCancel: this.payCancel,
+      payPinBtnLabel: s.payPinSent ? 'ارسال دوباره' : 'دریافت رمز پویا',
+      payBtnLabel: s.busy === 'order' ? 'در حال اتصال به بانک…' : 'پرداخت ' + this.fmt(t.total) + ' تومان',
+      payBtnStyle: this.ctaStyle('var(--p)', '#fff', s.busy === 'order'),
       refillBtnLabel: s.busy === 'refill' ? 'در حال ارسال درخواست…' : 'ثبت درخواست شارژ',
       refillBtnStyle: this.ctaStyle('var(--acc)', '#06343a', s.busy === 'refill'),
       usedBtnLabel: s.busy === 'used' ? 'در حال ارسال پیشنهاد…' : 'ثبت پیشنهاد فروش',
@@ -1689,17 +1721,15 @@ class Component extends DCLogic {
       submitUsed: this.submitUsed,
 
       // form success
-      fsTitle: s.fsKind === 'inquiry' ? 'درخواست استعلام قیمت ثبت شد' : s.fsKind === 'refill' ? 'درخواست شارژ ثبت شد' : 'پیشنهاد فروش ثبت شد',
+      fsTitle: s.fsKind === 'refill' ? 'درخواست شارژ ثبت شد' : 'پیشنهاد فروش ثبت شد',
       fsCode: s.fsCode,
       fsDelivery: s.requests[0] ? (s.requests[0].delivery || '') : '',
       fsHasDelivery: !!(s.fsKind === 'refill' && s.requests[0] && s.requests[0].delivery),
-      fsNote: s.fsKind === 'inquiry'
-        ? 'درخواست استعلام شما ثبت شد؛ کارشناسان قیمت روز را بررسی و در اسرع وقت با شما تماس می‌گیرند.'
-        : s.fsKind === 'refill'
+      fsNote: s.fsKind === 'refill'
         ? 'درخواست شما در صف بررسی اپراتور قرار گرفت؛ پس از تخصیص تکنسین، زمان مراجعه پیامک می‌شود.'
         : 'پیشنهاد شما در صف بررسی قرار گرفت؛ نتیجه (پذیرش، رد یا مذاکره) با پیامک اطلاع‌رسانی می‌شود.',
-      fsGoList: () => this.go({ route: s.fsKind === 'inquiry' ? 'inquiries' : 'requests' }),
-      fsListLabel: s.fsKind === 'inquiry' ? 'استعلام‌های من' : 'درخواست‌های من',
+      fsGoList: () => this.go({ route: 'requests' }),
+      fsListLabel: 'درخواست‌های من',
 
       // profile
       userName: s.userName || 'کاربر امداد اکسیژن',
@@ -1731,8 +1761,6 @@ class Component extends DCLogic {
       isRequestDetail: route === 'requestDetail',
       ...this.requestVM(s.requests.find(r => r.code === s.rqCode)),
       requestsEmpty: s.requests.length === 0,
-      inquiriesList: s.inquiries.map(iq => ({ title: iq.title, code: iq.code, date: iq.date, ...this.stepperVM('inquiry', iq.ts) })),
-      inquiriesEmpty: s.inquiries.length === 0,
       addrCards,
       wishItems: wishIds.map(id => this.vm(this.PRODUCTS.find(p => p.id === id))).filter(Boolean),
       wishEmpty: wishIds.length === 0,

@@ -50,7 +50,7 @@ See `Emdad Oxygen - Enhancements.md` for the full changelog and `docs/planning/M
 
 ## JSON database (`db.json`)
 
-Everything the app does is recorded in **`db.json`** at the project root, next to the HTML: logins, sign-ups and logouts, carts, wishlists, address books, orders, service requests (refill / equipment), price inquiries, and an activity log.
+Everything the app does is recorded in **`db.json`** at the project root, next to the HTML: logins, sign-ups and logouts, carts, wishlists, address books, orders, online payments, service requests (refill / equipment), and an activity log.
 
 ```bash
 npm start          # = node server.js → http://localhost:3000  (no npm install needed)
@@ -63,7 +63,8 @@ npm start          # = node server.js → http://localhost:3000  (no npm install
 | `users` | Phone number (`u_09…`): name, phone, `loginCount`, `lastLoginAt` |
 | `sessions` | `signup` (first verified login of a phone) / `login` / `logout` |
 | `carts`, `wishlists`, `addressBooks` | Owner: the user, or `guest_<device>` before login (latest state) |
-| `orders`, `serviceRequests`, `priceInquiries` | Submission, tied to the user |
+| `orders`, `serviceRequests` | Submission, tied to the user |
+| `payments` | Successful online payment: amount, tracking code, **masked** card only (never the full number, CVV2 or one-time code) |
 | `activity` | Every action: `auth.*`, `cart.update`, `order.place`, `catalog.search`, … |
 
 API endpoints:

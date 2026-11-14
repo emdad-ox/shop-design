@@ -164,3 +164,20 @@ Changes from the handwritten review notes ("10.13 Nov milad-amin"):
   - **Profile and catalog:** profile renames, theme changes, catalog searches and filters.
   - **Activity:** an event log of all of the above.
 - **Same data in the browser.** Every write is also saved in the browser (`emdad:db`), so the app behaves the same without a server. On GitHub Pages it doesn't look for the server at all.
+
+## Update — price inquiries removed, payment after checkout (branch `prototype`)
+- **Price inquiries removed, together with everything connected to them:**
+  - the «استعلام قیمت» pills, buttons and confirmation pop-up
+  - the «استعلام‌های قیمت» Profile menu row and page
+  - the inquiry success screen
+  - the inquiry state, flow and login hand-off
+  - the `priceInquiries` collection in `db.json`
+- **Every product is priced and can be bought.** The concentrator and the CO₂ cylinder had no price, so they now have **demo prices** (32,500,000 and 1,850,000 Toman), marked `TODO(content)` in `PRODUCTS`.
+- **Out of stock:** the button opens the contact pop-up. The earlier version of this button couldn't be tapped because its floating bar blocked clicks; that's fixed.
+- **Payment.** Checkout's button reads «ادامه و پرداخت» and opens a **payment page**:
+  - the amount, card number, CVV2, expiry and a one-time code (shown in a message in this demo)
+  - it's a **test gateway**: no money moves, and test card `6037 9975 9999 9993` is shown on the page
+  - the order is created **only after a successful payment**; cancelling returns to checkout with no order
+  - the order page shows "online payment successful · tracking code", and the invoice banner switches to «فاکتور پرداخت‌شده»
+- **Card data:** only the **masked** card number (`6037 99** **** 9993`) and the tracking code are saved, in the order and in `db.json` → `payments`. The full number, CVV2 and one-time code are never stored and are wiped after paying or cancelling.
+- **Activity log:** new event types `payment.start`, `payment.error`, `payment.cancel` and `payment.success`.
