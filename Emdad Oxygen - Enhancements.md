@@ -154,3 +154,13 @@ Changes from the handwritten review notes ("10.13 Nov milad-amin"):
 - **Bundled offline.** `build/build.py` builds the `@font-face` rules from `build/font_bundle/*.woff2` (Regular 400, Medium 500, Bold 700; about 130 KB) and adds them in front of the app CSS at build time. No network access is needed.
 - Weight 600 renders with the Bold file.
 - Vazirmatn stays only as the fallback in the font stacks.
+
+## Update — JSON database (branch `prototype`)
+- **`db.json`** (project root) is the app's database. **`server.js`** (`npm start`, no dependencies) serves the app and a REST API that writes to it.
+- **App sync layer** (`dbInit` / `dbSync` / `dbAuth` in `script_2.work.js`). After every change, the app compares the state with its previous snapshot and writes what changed:
+  - **Auth:** signup, login and logout records, and the user with first and last name.
+  - **Shopping:** carts, wishlists and address books, for the guest and then the logged-in user.
+  - **Submissions:** orders, service requests and price inquiries.
+  - **Profile and catalog:** profile renames, theme changes, catalog searches and filters.
+  - **Activity:** an event log of all of the above.
+- **Same data in the browser.** Every write is also saved in the browser (`emdad:db`), so the app behaves the same without a server. On GitHub Pages it doesn't look for the server at all.

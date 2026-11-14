@@ -1,0 +1,16 @@
+{
+  "meta": {
+    "app": "emdad-oxygen-shop",
+    "schema": 1,
+    "updatedAt": null
+  },
+  "users": [],
+  "sessions": [],
+  "carts": [],
+  "wishlists": [],
+  "addressBooks": [],
+  "orders": [],
+  "serviceRequests": [],
+  "priceInquiries": [],
+  "activity": []
+}

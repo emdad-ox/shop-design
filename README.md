@@ -48,6 +48,32 @@ A motion + polish + functional pass over the whole app:
 
 See `Emdad Oxygen - Enhancements.md` for the full changelog and `docs/planning/MASTER_ROADMAP.md` for the plan.
 
+## JSON database (`db.json`)
+
+Everything the app does is recorded in **`db.json`** at the project root, next to the HTML: logins, sign-ups and logouts, carts, wishlists, address books, orders, service requests (refill / equipment), price inquiries, and an activity log.
+
+```bash
+npm start          # = node server.js → http://localhost:3000  (no npm install needed)
+```
+
+`server.js` has no dependencies and needs Node 18 or newer. It serves the app and a small REST API that writes to `db.json`. It writes to a temporary file first and renames it, so a crash can't leave `db.json` half-written.
+
+| Collection | One record per… |
+|---|---|
+| `users` | Phone number (`u_09…`): name, phone, `loginCount`, `lastLoginAt` |
+| `sessions` | `signup` (first verified login of a phone) / `login` / `logout` |
+| `carts`, `wishlists`, `addressBooks` | Owner: the user, or `guest_<device>` before login (latest state) |
+| `orders`, `serviceRequests`, `priceInquiries` | Submission, tied to the user |
+| `activity` | Every action: `auth.*`, `cart.update`, `order.place`, `catalog.search`, … |
+
+API endpoints:
+- `GET /api/db` returns the whole database.
+- `GET`, `POST`, `PUT`, `PATCH`, `DELETE` on `/api/<collection>[/<id>]` read and change records.
+
+**Without the server** (GitHub Pages, double-clicking the file), the app still works. It saves the same records in the browser's local storage under the `emdad:db` key. To look at them, run `window.emdadDB.dump()` in the browser console. A static host can't write files, so `db.json` only fills up when the app runs through `npm start`.
+
+The committed `db.json` is an empty template. Writes from local testing change it, so don't commit real customer data.
+
 ## Caveats
 - Verified on a local dev server; the a11y and History-routing work is attribute/`activeElement`/`history.back()`-verified, not tested against a physical Back gesture or a live screen reader.
 - `localStorage` persistence under the `file://` origin varies by browser — the app always runs, but may not persist across reloads when opened directly from disk.

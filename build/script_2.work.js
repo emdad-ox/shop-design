@@ -89,6 +89,7 @@ class Component extends DCLogic {
     document.documentElement.dir = 'rtl';
     const hyd = this.hydrate();
     this.applyTheme();
+    this.dbInit();
     if (!(hyd && hyd.loggedIn) && (this.props.startLoggedIn ?? true) && !this.state.loggedIn) {
       this.setState({ loggedIn: true, userName: 'کاربر امداد اکسیژن', phone: '0912 845 7455' });
     }
@@ -193,8 +194,10 @@ class Component extends DCLogic {
     this.manageSuccessFx();
     this.manageAuthFx();
     if (this._hydrated) this.persist();
+    this.dbSync();
   }
   componentWillUnmount() {
+    if (window.emdadDB) delete window.emdadDB;
     document.removeEventListener('keydown', this._onKey);
     if (this._onScroll) window.removeEventListener('scroll', this._onScroll);
     if (this._onPop) window.removeEventListener('popstate', this._onPop);
@@ -622,6 +625,140 @@ class Component extends DCLogic {
       rdChipStyle: st.chipStyle, rdChipText: st.chipText, rdStageLabel: st.stageLabel, rdStepLabel: st.stepLabel,
     };
   }
+
+  // ======================================================================================
+  // JSON DB (db.json) — every login / signup / logout, cart, wishlist, address, order,
+  // service request, price inquiry, profile edit and catalog search is written to db.json
+  // through server.js (`npm start`). Writes are also mirrored in the browser (localStorage
+  // `emdad:db`, same schema) so the app behaves identically when no server is reachable
+  // (GitHub Pages, file://). Inspect from the console: window.emdadDB.dump() / .online().
+  // ======================================================================================
+  DB_API = '/api';
+  DB_LOCAL = 'emdad:db';
+  DB_COLS = ['users','sessions','carts','wishlists','addressBooks','orders','serviceRequests','priceInquiries','activity'];
+  deviceId() {
+    if (this._devId) return this._devId;
+    let id = null;
+    try { id = localStorage.getItem('emdad:device'); } catch (e) {}
+    if (!id) { id = 'd_' + Math.random().toString(36).slice(2, 10) + Date.now().toString(36); try { localStorage.setItem('emdad:device', id); } catch (e) {} }
+    return (this._devId = id);
+  }
+  userIdOf(phone) { const d = this.deFa(phone || '').replace(/\D/g, '').slice(-10); return d.length === 10 ? 'u_0' + d : null; }
+  dbOwner() { return (this.state.loggedIn && this.userIdOf(this.state.phone)) || ('guest_' + this.deviceId()); }
+  dbMirror() {
+    let db = null;
+    try { db = JSON.parse(localStorage.getItem(this.DB_LOCAL)); } catch (e) {}
+    if (!db || typeof db !== 'object') db = { meta: { app: 'emdad-oxygen-shop', schema: 1 } };
+    this.DB_COLS.forEach(c => { if (!Array.isArray(db[c])) db[c] = []; });
+    return db;
+  }
+  // apply one write to the browser mirror (same semantics as server.js)
+  dbApplyLocal(method, col, id, body) {
+    const db = this.dbMirror(), list = db[col], now = new Date().toISOString();
+    const idx = id == null ? -1 : list.findIndex(r => String(r.id) === String(id));
+    if (method === 'POST') list.push({ id: body.id || ('r_' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6)), createdAt: now, ...body });
+    else if (method === 'DELETE') { if (idx >= 0) list.splice(idx, 1); }
+    else {
+      const base = idx < 0 ? { id, createdAt: now } : (method === 'PATCH' ? list[idx] : { id, createdAt: list[idx].createdAt });
+      const rec = { ...base, ...body, id, updatedAt: now };
+      if (idx < 0) list.push(rec); else list[idx] = rec;
+    }
+    if (db.activity.length > 400) db.activity.splice(0, db.activity.length - 400);   // keep the mirror small
+    db.meta.updatedAt = now;
+    try { localStorage.setItem(this.DB_LOCAL, JSON.stringify(db)); } catch (e) {}
+  }
+  // one write → browser mirror (always) + server (when reachable). Resolves to the server's JSON or null.
+  dbWrite(method, col, id, body) {
+    this.dbApplyLocal(method, col, id, body || {});
+    const send = () => {
+      if (!this._dbOnline) return Promise.resolve(null);
+      const url = this.DB_API + '/' + col + (id != null ? '/' + encodeURIComponent(id) : '');
+      return fetch(url, { method, headers: { 'Content-Type': 'application/json' }, body: method === 'DELETE' ? undefined : JSON.stringify(body || {}) })
+        .then(r => (r.ok ? r.json() : null)).catch(() => null);
+    };
+    // writes made before the health probe answers wait for it (keeps signup/login ordering intact)
+    return (this._dbProbe || Promise.resolve()).then(send);
+  }
+  dbLog(type, data) {
+    return this.dbWrite('POST', 'activity', null, { type, at: new Date().toISOString(), userId: this.state.loggedIn ? this.userIdOf(this.state.phone) : null, deviceId: this.deviceId(), data: data || {} });
+  }
+  dbInit() {
+    // only probe where server.js can be running: not file://, not static hosting (GitHub Pages)
+    const httpish = /^https?:$/.test(location.protocol) && !/\.github\.io$/.test(location.hostname);
+    this._dbOnline = false;
+    this._dbProbe = !httpish ? Promise.resolve() : fetch(this.DB_API + '/health', { cache: 'no-store' })
+      .then(r => r.ok ? r.json() : null).then(j => { this._dbOnline = !!(j && j.ok); }).catch(() => {});
+    this._dbSnap = this.dbSnapshot();   // what is already stored (hydrated) is not re-sent as "new"
+    const self = this;
+    window.emdadDB = { dump: () => self.dbMirror(), online: () => !!self._dbOnline, api: self.DB_API };
+  }
+  dbSnapshot() {
+    const s = this.state;
+    return {
+      owner: this.dbOwner(), cart: JSON.stringify(s.cart), wish: JSON.stringify(s.wish), addr: JSON.stringify(s.addresses),
+      orders: new Set(s.orders.map(o => o.no)), requests: new Set(s.requests.map(r => r.code)), inquiries: new Set(s.inquiries.map(q => q.code)),
+      name: s.userName, theme: this.theme(), q: s.q, cat: s.cat,
+    };
+  }
+  // called after every committed state change: diff against the last snapshot and write what changed
+  dbSync() {
+    if (!this._dbSnap) return;
+    const s = this.state, prev = this._dbSnap, now = this.dbSnapshot(), owner = now.owner;
+    const userId = s.loggedIn ? this.userIdOf(s.phone) : null;
+    const prod = (id) => this.PRODUCTS.find(p => p.id === id) || {};
+    if (now.cart !== prev.cart || owner !== prev.owner) {
+      const items = Object.entries(s.cart).map(([pid, qty]) => ({ pid, title: prod(pid).title || pid, qty, unitPrice: prod(pid).price || 0 }));
+      this.dbWrite('PUT', 'carts', owner, { ownerId: owner, userId, deviceId: this.deviceId(), items, count: items.reduce((a, i) => a + i.qty, 0) });
+      if (now.cart !== prev.cart) this.dbLog('cart.update', { items });
+    }
+    if (now.wish !== prev.wish || owner !== prev.owner) {
+      const items = Object.keys(s.wish).filter(k => s.wish[k]).map(pid => ({ pid, title: prod(pid).title || pid }));
+      this.dbWrite('PUT', 'wishlists', owner, { ownerId: owner, userId, items });
+      if (now.wish !== prev.wish) this.dbLog('wishlist.update', { items });
+    }
+    if (now.addr !== prev.addr || owner !== prev.owner) {
+      this.dbWrite('PUT', 'addressBooks', owner, { ownerId: owner, userId, addresses: s.addresses });
+      if (now.addr !== prev.addr) this.dbLog('address.update', { count: s.addresses.length });
+    }
+    s.orders.filter(o => !prev.orders.has(o.no)).forEach(o => {
+      this.dbWrite('POST', 'orders', null, { ...o, id: o.no, userId, phone: s.phone, customer: s.userName });
+      this.dbLog('order.place', { no: o.no, total: o.total });
+    });
+    s.requests.filter(r => !prev.requests.has(r.code)).forEach(r => {
+      this.dbWrite('POST', 'serviceRequests', null, { ...r, id: r.code, userId, phone: s.phone, customer: s.userName });
+      this.dbLog('service.request', { code: r.code, kind: r.kind });
+    });
+    s.inquiries.filter(q => !prev.inquiries.has(q.code)).forEach(q => {
+      this.dbWrite('POST', 'priceInquiries', null, { ...q, id: q.code, userId, customer: s.userName });
+      this.dbLog('price.inquiry', { code: q.code, pid: q.pid });
+    });
+    if (s.loggedIn && userId && now.name !== prev.name && prev.owner === owner) {
+      this.dbWrite('PATCH', 'users', userId, { name: s.userName });
+      this.dbLog('profile.rename', { name: s.userName });
+    }
+    if (now.theme !== prev.theme) this.dbLog('settings.theme', { theme: now.theme });
+    if (now.cat !== prev.cat) this.dbLog('catalog.filter', { cat: now.cat });
+    if (now.q !== prev.q && (now.q || '').trim()) this.dbLog('catalog.search', { q: now.q.trim() });
+    this._dbSnap = now;
+  }
+  // explicit auth records: signup (first verified login of a phone) vs login, plus logout
+  dbAuth(kind, phone, extra) {
+    const userId = this.userIdOf(phone); if (!userId) return;
+    const at = new Date().toISOString();
+    if (kind === 'logout') {
+      this.dbWrite('POST', 'sessions', null, { userId, phone, type: 'logout', at, deviceId: this.deviceId() });
+      this.dbLog('auth.logout', { userId });
+      return;
+    }
+    const knewLocally = this.dbMirror().users.some(u => u.id === userId);
+    const prevCount = (this.dbMirror().users.find(u => u.id === userId) || {}).loginCount || 0;
+    this.dbWrite('PATCH', 'users', userId, { phone, ...extra, lastLoginAt: at, loginCount: prevCount + 1 }).then(res => {
+      const type = res ? (res.created ? 'signup' : 'login') : (knewLocally ? 'login' : 'signup');
+      this.dbWrite('POST', 'sessions', null, { userId, phone, type, at, deviceId: this.deviceId() });
+      this.dbLog('auth.' + type, { userId });
+    });
+  }
+
   // ---------- contact sheet (notes 13-Nov #9/#10) ----------
   // Shown by the support button. Edit these values to match the official Emdad Oxygen website.
   // TODO(content): the street address could not be fetched from the website in this session —
@@ -1039,6 +1176,7 @@ class Component extends DCLogic {
   sendOtp = () => {
     if (this.state.authFirst.trim().length < 2 || this.state.authLast.trim().length < 2) { this.setState({ authErr: 'نام و نام خانوادگی را وارد کنید' }); return; }
     if (!this.validPhone(this.state.authPhone)) { this.setState({ authErr: 'شماره موبایل معتبر ایران وارد کنید (مثلاً 09123456789)' }); return; }
+    this.dbLog('auth.otp_requested', { phone: this.deFa(this.state.authPhone) });
     this.setState({ authStep: 'code', authErr: '', otp: '' });
     this.startCountdown();
     this.toast('کد تأیید پیامک شد');
@@ -1055,6 +1193,7 @@ class Component extends DCLogic {
       loggedIn: true, userName: (this.state.authFirst.trim() + ' ' + this.state.authLast.trim()).trim() || this.state.userName || 'کاربر امداد اکسیژن',
       phone: pretty, authErr: '', otp: '', resendIn: 0, pendingSubmit: null
     }, () => {
+      this.dbAuth('login', pretty, { firstName: this.state.authFirst.trim(), lastName: this.state.authLast.trim(), name: this.state.userName });
       this.toast('با موفقیت وارد شدید');
       if (pending === 'refill') this.completeRefill();
       else if (pending === 'used') this.completeUsed();
@@ -1570,7 +1709,7 @@ class Component extends DCLogic {
       startEditName: () => this.setState({ editingName: true, nameInput: s.userName }),
       nameInput: s.nameInput, onNameInput: (e) => this.setState({ nameInput: e.target.value }),
       saveName: () => { this.setState({ userName: s.nameInput.trim() || s.userName, editingName: false }); this.toast('نام شما ذخیره شد'); },
-      logout: () => { this.setState({ loggedIn: false, userName: '', phone: '' }); this.toast('از حساب خارج شدید'); },
+      logout: () => { this.dbAuth('logout', s.phone); this.setState({ loggedIn: false, userName: '', phone: '' }); this.toast('از حساب خارج شدید'); },
       menuRows,
 
       // delivery scheduler (P7)

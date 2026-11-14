@@ -1,0 +1,13 @@
+{
+  "name": "emdad-oxygen-shop",
+  "private": true,
+  "version": "1.0.0",
+  "description": "Emdad Oxygen shop prototype + local JSON-DB server",
+  "scripts": {
+    "start": "node server.js",
+    "build": "python3 build/build.py"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}
