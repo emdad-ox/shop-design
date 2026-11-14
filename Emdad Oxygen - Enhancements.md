@@ -181,3 +181,22 @@ Changes from the handwritten review notes ("10.13 Nov milad-amin"):
   - the order page shows "online payment successful · tracking code", and the invoice banner switches to «فاکتور پرداخت‌شده»
 - **Card data:** only the **masked** card number (`6037 99** **** 9993`) and the tracking code are saved, in the order and in `db.json` → `payments`. The full number, CVV2 and one-time code are never stored and are wiped after paying or cancelling.
 - **Activity log:** new event types `payment.start`, `payment.error`, `payment.cancel` and `payment.success`.
+
+## Update — admin dashboard (branch `prototype`)
+- **`admin.html`**, a full administration panel built from `build/admin.src.html`. Sections:
+  - **overview** (KPIs, recent orders and requests, live activity)
+  - **orders** (search, filter, detail, stage and cancel)
+  - **service requests**
+  - **payments**
+  - **products** (add, edit, delete, show or hide, price, stock, specs, image)
+  - **services** (edit the built-ins, add new ones)
+  - **customers** (with history)
+  - **activity log**
+  - **data** (download `db.json`, clear test data)
+- **The app follows the dashboard.**
+  - Products and services now load from the database; admin-added products get a category image.
+  - Order and request stages come from the admin, including a new **«لغو شد»** (cancelled) state. Stages no longer advance by themselves over time.
+  - Services page cards are bound to the services database, and admin-added services are listed and open the contact pop-up.
+  - The app refreshes on focus, on changes from another tab, and every 15 seconds.
+- **`db.json` and `server.js`:** new `products` and `services` collections, seeded with the current catalogue (8 products, 2 services).
+- **Demo admin password:** `emdad-admin`. It's a client-side gate, not real security.

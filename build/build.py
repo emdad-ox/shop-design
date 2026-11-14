@@ -89,3 +89,13 @@ print("BUILD OK ->", OUT, "| bytes:", len(html2))
 idx = os.path.join(ROOT, "index.html")
 open(idx, "w", encoding="utf-8").write(html2)
 print("BUILD OK (GitHub Pages) ->", idx)
+
+# ---- Admin dashboard: build/admin.src.html → admin.html (project root, beside the app), with the
+# same bundled Vazir @font-face rules so it also works offline. Reads/writes db.json via server.js.
+admin_src = f"{SCRATCH}/admin.src.html"
+if os.path.exists(admin_src):
+    a = open(admin_src, encoding="utf-8").read()
+    assert a.count("/*__VAZIR_FONTS__*/") == 1, "admin.src.html must contain the font marker exactly once"
+    a = a.replace("/*__VAZIR_FONTS__*/", faces if "faces" in dir() else "")
+    open(os.path.join(ROOT, "admin.html"), "w", encoding="utf-8").write(a)
+    print("BUILD OK (admin) ->", os.path.join(ROOT, "admin.html"), "| bytes:", len(a))

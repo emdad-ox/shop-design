@@ -75,6 +75,30 @@ API endpoints:
 
 The committed `db.json` is an empty template. Writes from local testing change it, so don't commit real customer data.
 
+## Admin dashboard (`admin.html`)
+
+`admin.html` sits next to the app. It is built from `build/admin.src.html` by `python3 build/build.py`, with the same bundled Vazir font, so it also works offline. It works on the same data as the app:
+
+| Section | What an admin can do |
+|---|---|
+| **Overview** | Paid revenue, orders in progress, open requests, customers, low-stock products, today's activity, recent orders, requests and events |
+| **Orders** | Search by number, name or phone; filter by status; open an order (items, address, delivery, payment with masked card and tracking code); set the stage (placed → preparing → shipped → delivered) or **cancel** |
+| **Service requests** | Filter refill and equipment requests; open one; set the stage or cancel |
+| **Payments** | Every successful payment with tracking code, masked card and total |
+| **Products** | **Add**, edit or delete products: name, category, image, price, stock, "new" label, description, specs, show or hide in the app |
+| **Services** | Edit the two built-in services (title, subtitle, show or hide) and **add new services**. New ones appear on the app's Services page and open the contact pop-up |
+| **Customers** | Sign-ups with login count, last login, orders, amount spent and requests; open one for their history |
+| **Activity log** | Every app and admin event, filterable |
+| **Data** | Data source, record counts, download `db.json`, clear test data (browser mode) |
+
+**How the app follows the dashboard:**
+- Stages set in the dashboard show in the customer's app. A new order or request stays at stage 1 until an admin moves it.
+- Product and service changes show in the app within about 15 seconds, or immediately when the app tab regains focus.
+
+**Data source.** With `npm start`, the app and the dashboard both read and write `db.json` through the API (the dashboard shows "متصل به db.json"). Without a server, for example on GitHub Pages, both use the same browser storage on that site (the dashboard shows "حالت مرورگر"). An order placed in the app then appears in the dashboard in the same browser, and the dashboard's changes reach the app.
+
+**Sign-in.** The demo admin password is `emdad-admin`. It's a client-side gate for the prototype, **not real security**: a production admin needs server-side authentication.
+
 ## Caveats
 - Verified on a local dev server; the a11y and History-routing work is attribute/`activeElement`/`history.back()`-verified, not tested against a physical Back gesture or a live screen reader.
 - `localStorage` persistence under the `file://` origin varies by browser — the app always runs, but may not persist across reloads when opened directly from disk.

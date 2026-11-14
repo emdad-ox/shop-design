@@ -200,6 +200,9 @@ class Component extends DCLogic {
   }
   componentWillUnmount() {
     if (window.emdadDB) delete window.emdadDB;
+    clearInterval(this._dbPollT);
+    if (this._onDbStorage) window.removeEventListener('storage', this._onDbStorage);
+    if (this._onDbFocus) document.removeEventListener('visibilitychange', this._onDbFocus);
     document.removeEventListener('keydown', this._onKey);
     if (this._onScroll) window.removeEventListener('scroll', this._onScroll);
     if (this._onPop) window.removeEventListener('popstate', this._onPop);
@@ -265,7 +268,8 @@ class Component extends DCLogic {
     const A = this.PRODUCT_ART;
     const inject = (el, id) => {
       if (!el) return;
-      const a = this.ART_OF[id] || 'cyl';
+      const pr = this.PRODUCTS.find(x => x.id === id);
+      const a = this.ART_OF[id] || (pr && pr.art) || ({ cyl: 'cyl', dev: 'dev', acc: 'mano' }[pr && pr.cat]) || 'cyl';
       if (el.__art === a) return;
       el.innerHTML = A[a] || A.cyl; el.__art = a;
       el.style.display = 'grid'; el.style.placeItems = 'center'; el.style.color = 'var(--p)';
@@ -574,12 +578,12 @@ class Component extends DCLogic {
     refill:  ['ثبت درخواست', 'جمع‌آوری کپسول', 'در حال شارژ', 'تحویل شد'],
     used:    ['ثبت درخواست', 'در حال بررسی', 'قیمت‌گذاری', 'تکمیل شد'],
   };
-  // Demo-paced fulfilment: a fresh record sits at stage 1, then advances over real elapsed
-  // time (persisted ts keeps progressing across reloads). Clamped to the final stage.
-  stageOf(ts) { if (!ts) return 1; const m = (Date.now() - ts) / 60000; return m >= 8 ? 4 : m >= 3 ? 3 : m >= 0.75 ? 2 : 1; }
-  stepperVM(kind, ts) {
+  // Fulfilment stage is set by the admin dashboard (record.stage 1..4, record.status 'cancelled');
+  // a new record sits at stage 1 until an admin moves it. (Was: demo time-based auto-advance.)
+  stageOf(rec) { const n = rec && +rec.stage; return n >= 1 && n <= 4 ? n : 1; }
+  stepperVM(kind, rec) {
     const names = this.STAGES[kind] || this.STAGES.order;
-    const st = this.stageOf(ts), final = st >= 4;
+    const st = this.stageOf(rec), final = st >= 4, cancelled = !!(rec && rec.status === 'cancelled');
     const dot = (n) => {
       const reached = st >= n, active = st === n;
       return 'width:12px;height:12px;border-radius:999px;flex:none;background:' + (reached ? 'var(--p)' : 'var(--sur2)')
@@ -587,10 +591,10 @@ class Component extends DCLogic {
     };
     const seg = (n) => 'flex:1;height:2px;border-radius:2px;background:' + (st > n ? 'var(--p)' : 'var(--line)');
     return {
-      stageLabel: names[st - 1], stepLabel: 'مرحله ' + this.fmt(st) + ' از ۴',
-      chipText: names[st - 1],
+      stageLabel: cancelled ? 'لغو شد' : names[st - 1], stepLabel: cancelled ? 'این مورد لغو شده است' : 'مرحله ' + this.fmt(st) + ' از ۴',
+      chipText: cancelled ? 'لغو شد' : names[st - 1],
       chipStyle: 'font-size:10.5px;font-weight:700;padding:4px 12px;border-radius:999px;color:'
-        + (final ? 'var(--ok)' : 'var(--p)') + ';background:' + (final ? 'var(--ok-soft)' : 'var(--p-soft)'),
+        + (cancelled ? 'var(--err)' : final ? 'var(--ok)' : 'var(--p)') + ';background:' + (cancelled ? 'var(--err-soft)' : final ? 'var(--ok-soft)' : 'var(--p-soft)'),
       dot1: dot(1), dot2: dot(2), dot3: dot(3), dot4: dot(4), seg1: seg(1), seg2: seg(2), seg3: seg(3),
     };
   }
@@ -600,7 +604,7 @@ class Component extends DCLogic {
   // exactly what was ordered/requested.
   orderVM(o) {
     if (!o) return {};
-    const st = this.stepperVM('order', o.ts);
+    const st = this.stepperVM('order', o);
     return {
       odInvTitle: o.paid ? 'فاکتور پرداخت‌شده —' : 'پیش‌فاکتور —',
       odInvNote: o.paid ? 'مبلغ به‌صورت آنلاین پرداخت شد (کارت \u2066' + o.payCard + '\u2069). زمان تحویل را همکاران ما هماهنگ می‌کنند.' : 'پرداخت آنلاین انجام نشده و مبلغ نهایی و زمان تحویل هنگام تماس همکاران ما تأیید می‌شود.',
@@ -619,7 +623,7 @@ class Component extends DCLogic {
   }
   requestVM(r) {
     if (!r) return {};
-    const st = this.stepperVM(r.kind, r.ts);
+    const st = this.stepperVM(r.kind, r);
     return {
       rdKind: r.kind === 'refill' ? 'شارژ کپسول گاز' : 'فروش تجهیزات',
       rdCode: r.code, rdDate: r.date,
@@ -641,7 +645,7 @@ class Component extends DCLogic {
   // ======================================================================================
   DB_API = '/api';
   DB_LOCAL = 'emdad:db';
-  DB_COLS = ['users','sessions','carts','wishlists','addressBooks','orders','payments','serviceRequests','activity'];
+  DB_COLS = ['users','sessions','carts','wishlists','addressBooks','orders','payments','serviceRequests','products','services','activity'];
   deviceId() {
     if (this._devId) return this._devId;
     let id = null;
@@ -688,6 +692,56 @@ class Component extends DCLogic {
   dbLog(type, data) {
     return this.dbWrite('POST', 'activity', null, { type, at: new Date().toISOString(), userId: this.state.loggedIn ? this.userIdOf(this.state.phone) : null, deviceId: this.deviceId(), data: data || {} });
   }
+  // ---- catalogue managed from the admin dashboard (admin.html) ----
+  DEFAULT_SERVICES = [
+    { id: 'refill', kind: 'refill', title: 'درخواست شارژ کپسول گاز', subtitle: 'عکس کپسول را بفرستید؛ تحویل درب منزل یا حضوری', active: true, builtIn: true, sort: 1 },
+    { id: 'used', kind: 'used', title: 'فروش تجهیزات', subtitle: 'تجهیزات خود را با قیمت پیشنهادی ثبت کنید', active: true, builtIn: true, sort: 2 },
+  ];
+  prodToDb(p, i) { return { id: p.id, title: p.title, cat: p.cat, gas: p.gas, price: p.price, stock: p.stock, isNew: !!p.new, active: true, desc: p.desc, specs: p.specs, art: this.ART_OF[p.id] || null, sort: i + 1 }; }
+  prodFromDb(d) {
+    return { id: d.id, title: d.title, cat: d.cat || 'acc', gas: d.gas || '', price: Math.max(0, +d.price || 0), vis: true,
+      stock: Math.max(0, +d.stock || 0), new: !!d.isNew, desc: d.desc || '', specs: Array.isArray(d.specs) ? d.specs : [], art: d.art || null };
+  }
+  // pull admin-managed data: catalogue (products, services) + statuses of this user's orders/requests
+  dbPull() {
+    const apply = (db) => {
+      if (!db || typeof db !== 'object') return;
+      const bySort = (a, b) => (+a.sort || 999) - (+b.sort || 999);
+      const prods = (Array.isArray(db.products) ? db.products : []).filter(p => p && p.id && p.title);
+      if (prods.length) this.PRODUCTS = prods.filter(p => p.active !== false).sort(bySort).map(p => this.prodFromDb(p));
+      const svcs = (Array.isArray(db.services) ? db.services : []).filter(v => v && v.id && v.title);
+      this.SERVICES = (svcs.length ? svcs : this.DEFAULT_SERVICES).slice().sort(bySort);
+      const om = new Map((db.orders || []).map(o => [String(o.id), o])), rm = new Map((db.serviceRequests || []).map(r => [String(r.id), r]));
+      let changed = false;
+      const merge = (rec, d) => { if (d && (d.stage !== rec.stage || d.status !== rec.status)) { changed = true; return { ...rec, stage: d.stage, status: d.status }; } return rec; };
+      const orders = this.state.orders.map(o => merge(o, om.get(String(o.no))));
+      const requests = this.state.requests.map(r => merge(r, rm.get(String(r.code))));
+      const ids = new Set(this.PRODUCTS.map(p => p.id)), cart = {}, wish = {};
+      Object.keys(this.state.cart).forEach(k => { if (ids.has(k)) cart[k] = this.state.cart[k]; else changed = true; });
+      Object.keys(this.state.wish).forEach(k => { if (ids.has(k)) wish[k] = this.state.wish[k]; else changed = true; });
+      this.setState({ catalogRev: (this.state.catalogRev || 0) + 1, ...(changed ? { orders, requests, cart, wish } : {}) });
+    };
+    if (this._dbOnline) fetch(this.DB_API + '/db', { cache: 'no-store' }).then(r => (r.ok ? r.json() : null)).then(apply).catch(() => {});
+    else apply(this.dbMirror());
+  }
+  // first run: make sure the catalogue exists where the admin dashboard will read it
+  dbSeedCatalogue() {
+    const defaults = this.PRODUCTS.map((p, i) => this.prodToDb(p, i));
+    const m = this.dbMirror();
+    if (!m.products.length || !m.services.length) {
+      if (!m.products.length) m.products = defaults;
+      if (!m.services.length) m.services = this.DEFAULT_SERVICES;
+      try { localStorage.setItem(this.DB_LOCAL, JSON.stringify(m)); } catch (e) {}
+    }
+    if (this._dbOnline) fetch(this.DB_API + '/db', { cache: 'no-store' }).then(r => (r.ok ? r.json() : null)).then(db => {
+      if (!db) return;
+      const jobs = [];
+      if (!(db.products || []).length) defaults.forEach(p => jobs.push(fetch(this.DB_API + '/products/' + encodeURIComponent(p.id), { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(p) })));
+      if (!(db.services || []).length) this.DEFAULT_SERVICES.forEach(v => jobs.push(fetch(this.DB_API + '/services/' + v.id, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(v) })));
+      return Promise.all(jobs);
+    }).catch(() => {}).then(() => this.dbPull());
+    else this.dbPull();
+  }
   dbInit() {
     // only probe where server.js can be running: not file://, not static hosting (GitHub Pages)
     const httpish = /^https?:$/.test(location.protocol) && !/\.github\.io$/.test(location.hostname);
@@ -696,7 +750,15 @@ class Component extends DCLogic {
       .then(r => r.ok ? r.json() : null).then(j => { this._dbOnline = !!(j && j.ok); }).catch(() => {});
     this._dbSnap = this.dbSnapshot();   // what is already stored (hydrated) is not re-sent as "new"
     const self = this;
-    window.emdadDB = { dump: () => self.dbMirror(), online: () => !!self._dbOnline, api: self.DB_API };
+    window.emdadDB = { dump: () => self.dbMirror(), online: () => !!self._dbOnline, api: self.DB_API, pull: () => self.dbPull() };
+    this.SERVICES = this.DEFAULT_SERVICES;
+    this._dbProbe.then(() => this.dbSeedCatalogue());
+    // live: admin changes (other tab via localStorage, or db.json via the server) reach the app
+    this._onDbStorage = (e) => { if (e.key === this.DB_LOCAL && !this._dbOnline) this.dbPull(); };
+    this._onDbFocus = () => { if (document.visibilityState !== 'hidden') this.dbPull(); };
+    window.addEventListener('storage', this._onDbStorage);
+    document.addEventListener('visibilitychange', this._onDbFocus);
+    this._dbPollT = setInterval(() => { if (document.visibilityState === 'visible') this.dbPull(); }, 15000);
   }
   dbSnapshot() {
     const s = this.state;
@@ -1747,12 +1809,12 @@ class Component extends DCLogic {
       coSlots: this.SLOTS.map(sl => { const past = this.slotPast(s.coDay, sl[0]); return { key: sl[0], label: sl[1], style: this.slotChipStyle(this.effSlot(s.coDay, s.coSlot) === sl[0], past), pick: () => { if (!past) this.setState({ coSlot: s.coSlot === sl[0] ? '' : sl[0] }); } }; }),
       successDelivery: s.orders[0] ? (s.orders[0].delivery || '') : '',
 
-      ordersList: s.orders.map(o => ({ no: o.no, date: o.date, countLabel: this.fmt(o.count), totalLabel: this.fmt(o.total), delivery: o.delivery || 'هماهنگی تلفنی', open: () => this.go({ route: 'orderDetail', odId: o.no, odFresh: false }), ...this.stepperVM('order', o.ts) })),
+      ordersList: s.orders.map(o => ({ no: o.no, date: o.date, countLabel: this.fmt(o.count), totalLabel: this.fmt(o.total), delivery: o.delivery || 'هماهنگی تلفنی', open: () => this.go({ route: 'orderDetail', odId: o.no, odFresh: false }), ...this.stepperVM('order', o) })),
       ordersEmpty: s.orders.length === 0,
       requestsList: s.requests.map(r => ({
         kindLabel: r.kind === 'refill' ? 'شارژ کپسول گاز' : 'فروش تجهیزات',
         code: r.code, date: r.date, delivery: r.delivery || '', showDelivery: !!(r.kind === 'refill' && r.delivery),
-        open: () => this.go({ route: 'requestDetail', rqCode: r.code }), ...this.stepperVM(r.kind, r.ts)
+        open: () => this.go({ route: 'requestDetail', rqCode: r.code }), ...this.stepperVM(r.kind, r)
       })),
       // Epic 3+5 / 4: detail view-models (od*/rd*) + route flags. Computed every render (cheap); the
       // od*/rd* keys are only consumed by the orderDetail / requestDetail screens.
@@ -1767,6 +1829,16 @@ class Component extends DCLogic {
 
       toastShow: s.toastShow, toastMsg: s.toastMsg,
       fabStyle, toastWrapStyle,
+      ...(() => {
+        const sv = this.SERVICES || this.DEFAULT_SERVICES, get = (id) => sv.find(x => x.id === id) || this.DEFAULT_SERVICES.find(x => x.id === id);
+        const r = get('refill'), u = get('used');
+        return {
+          svcRefillOn: r.active !== false, svcRefillTitle: r.title, svcRefillSub: r.subtitle || '',
+          svcUsedOn: u.active !== false, svcUsedTitle: u.title, svcUsedSub: u.subtitle || '',
+          extraServices: sv.filter(x => !x.builtIn && x.active !== false && x.id !== 'refill' && x.id !== 'used')
+            .map(x => ({ id: x.id, title: x.title, sub: x.subtitle || x.desc || '', open: () => { this.dbLog('service.interest', { service: x.id }); this.setState({ contactOpen: true }); } })),
+        };
+      })(),
       contactOpen: s.contactOpen, openContact: () => this.setState({ contactOpen: true }), closeContact: () => this.setState({ contactOpen: false }),
       contactAddress: this.CONTACT.address, contactHours: this.CONTACT.hours, contactPhoneLabel: this.CONTACT.phoneLabel,
       contactTelHref: 'tel:' + this.CONTACT.tel, contactCallLabel: 'تماس با ' + this.CONTACT.phoneLabel,
