@@ -82,16 +82,19 @@ The committed `db.json` is an empty template. Writes from local testing change i
 | Section | What an admin can do |
 |---|---|
 | **Overview** | Paid revenue, orders in progress, open requests, customers, low-stock products, today's activity, recent orders, requests and events |
-| **Orders** | Search by number, name or phone; filter by status; open an order (items, address, delivery, payment with masked card and tracking code); set the stage (placed → preparing → shipped → delivered) or **cancel** |
-| **Service requests** | Filter refill and equipment requests; open one; set the stage or cancel |
+| **Orders** | Search by number, name or phone; filter by status; open an order (items, address, delivery, payment with masked card and tracking code); set the stage (placed → preparing → shipped → delivered) or **cancel**; **edit** the address, delivery time and note; **delete** |
+| **Service requests** | Filter refill and equipment requests; open one; set the stage or cancel; **edit** (delivery time and notes, or offered price and description); **delete** |
 | **Payments** | Every successful payment with tracking code, masked card and total |
 | **Products** | **Add**, edit or delete products: name, category, image, price, stock, "new" label, description, specs, show or hide in the app |
 | **Services** | Edit the two built-in services (title, subtitle, show or hide) and **add new services**. New ones appear on the app's Services page and open the contact pop-up |
-| **Customers** | Sign-ups with login count, last login, orders, amount spent and requests; open one for their history |
+| **Customers** | List of all users with login count, last login, orders, amount spent and requests; open one for their history; **edit** the name; **delete** (signs them out of the app) |
 | **Activity log** | Every app and admin event, filterable |
 | **Data** | Data source, record counts, download `db.json`, clear test data (browser mode) |
 
+Orders and service requests are created only by customers in the app. Admins edit and delete them but don't create them.
+
 **How the app follows the dashboard:**
+- For a signed-in customer, their **profile name, orders and service requests come from the database**. Admin edits and deletions show in their app, and with `npm start` the same account sees its records on any device. Customers see only their own data; the list of all users is in the dashboard only.
 - Stages set in the dashboard show in the customer's app. A new order or request stays at stage 1 until an admin moves it.
 - Product and service changes show in the app within about 15 seconds, or immediately when the app tab regains focus.
 

@@ -375,6 +375,7 @@ function showOrder(id) {
     + '<dt>آدرس</dt><dd>' + esc((o.addrTitle ? o.addrTitle + ' — ' : '') + (o.addrText || '—')) + '</dd><dt>زمان تحویل</dt><dd>' + esc(o.delivery || '—') + '</dd>' + (o.note ? '<dt>یادداشت</dt><dd>' + esc(o.note) + '</dd>' : '') + '</dl>'
     + '<div class="box"><b>اقلام</b><div class="tbl"><table><tbody>' + (items || '<tr><td class="muted">—</td></tr>') + '</tbody></table></div>'
     + '<dl class="kv" style="margin:10px 0 0"><dt>جمع اقلام</dt><dd class="num">' + toman(o.subtotal) + '</dd>' + (o.disc ? '<dt>تخفیف</dt><dd class="num">' + toman(o.disc) + (o.discCode ? ' (' + esc(o.discCode) + ')' : '') + '</dd>' : '') + '<dt><b>مبلغ کل</b></dt><dd class="num"><b>' + toman(o.total) + '</b></dd></dl></div>'
+    + '<div class="actions" style="justify-content:flex-start;margin:0 0 14px"><button class="btn sm" data-a="order-edit" data-id="' + esc(o.id) + '">ویرایش جزئیات</button><button class="btn sm dan" data-a="order-del" data-id="' + esc(o.id) + '">حذف سفارش</button></div>'
     + '<div class="box"><b>پرداخت</b><dl class="kv" style="margin:8px 0 0">' + (o.paid ? '<dt>وضعیت</dt><dd><span class="badge ok">پرداخت آنلاین موفق</span></dd><dt>کد پیگیری</dt><dd><span class="ltr num">' + esc(o.payRef) + '</span></dd><dt>کارت</dt><dd><span class="ltr num">' + esc(o.payCard || '—') + '</span></dd>' : '<dt>وضعیت</dt><dd><span class="badge warn">پرداخت‌نشده</span></dd>') + '</dl></div>');
 }
 function showRequest(id) {
@@ -382,13 +383,14 @@ function showRequest(id) {
   openOverlay(head((KIND[r.kind] || 'درخواست') + ' <span class="ltr num">' + esc(r.id) + '</span>') + stageControl(r.kind, r, 'request-stage')
     + '<dl class="kv"><dt>نوع</dt><dd>' + esc(KIND[r.kind] || r.kind) + '</dd><dt>مشتری</dt><dd>' + esc(custName(r)) + '</dd><dt>تلفن</dt><dd><span class="ltr num">' + esc(r.phone || '—') + '</span></dd><dt>زمان ثبت</dt><dd>' + when(r) + '</dd>'
     + (r.delivery ? '<dt>زمان تحویل</dt><dd>' + esc(r.delivery) + '</dd>' : '') + (r.price ? '<dt>قیمت پیشنهادی</dt><dd class="num">' + toman(r.price) + '</dd>' : '')
-    + (r.desc ? '<dt>توضیحات</dt><dd>' + esc(r.desc) + '</dd>' : '') + (r.notes ? '<dt>یادداشت</dt><dd>' + esc(r.notes) + '</dd>' : '') + '</dl>');
+    + (r.desc ? '<dt>توضیحات</dt><dd>' + esc(r.desc) + '</dd>' : '') + (r.notes ? '<dt>یادداشت</dt><dd>' + esc(r.notes) + '</dd>' : '') + '</dl>'
+    + '<div class="actions" style="justify-content:flex-start"><button class="btn sm" data-a="request-edit" data-id="' + esc(r.id) + '">ویرایش جزئیات</button><button class="btn sm dan" data-a="request-del" data-id="' + esc(r.id) + '">حذف درخواست</button></div>');
 }
 function showCustomer(id) {
   const u = DB.users.find(x => x.id === id); if (!u) return;
   const os = newest(DB.orders.filter(o => o.userId === id)), rs = newest(DB.serviceRequests.filter(r => r.userId === id));
   const ss = newest(DB.sessions.filter(s => s.userId === id)).slice(0, 8);
-  openOverlay(head(esc(u.name || 'مشتری')) + '<dl class="kv"><dt>تلفن</dt><dd><span class="ltr num">' + esc(u.phone) + '</span></dd><dt>عضویت</dt><dd>' + when({ at: u.createdAt }) + '</dd><dt>تعداد ورود</dt><dd class="num">' + fa(u.loginCount || 0) + '</dd></dl>'
+  openOverlay(head(esc(u.name || 'مشتری')) + '<div class="actions" style="justify-content:flex-start;margin:0 0 14px"><button class="btn sm" data-a="user-edit" data-id="' + esc(u.id) + '">ویرایش</button><button class="btn sm dan" data-a="user-del" data-id="' + esc(u.id) + '">حذف کاربر</button></div><dl class="kv"><dt>تلفن</dt><dd><span class="ltr num">' + esc(u.phone) + '</span></dd><dt>عضویت</dt><dd>' + when({ at: u.createdAt }) + '</dd><dt>تعداد ورود</dt><dd class="num">' + fa(u.loginCount || 0) + '</dd></dl>'
     + '<div class="box"><b>سفارش‌ها</b>' + table(['شماره', 'مبلغ', 'وضعیت'], os.map(o => ({ id: o.id, cells: ['<span class="ltr num">' + esc(o.id) + '</span>', '<span class="num">' + toman(o.total) + '</span>', stageBadge('order', o)] })), 'order') + '</div>'
     + '<div class="box"><b>درخواست‌ها</b>' + table(['کد', 'نوع', 'وضعیت'], rs.map(r => ({ id: r.id, cells: ['<span class="ltr num">' + esc(r.id) + '</span>', esc(KIND[r.kind] || r.kind), stageBadge(r.kind, r)] })), 'request') + '</div>'
     + '<div class="box"><b>ورود و خروج</b>' + (ss.length ? '<ul class="feed small">' + ss.map(s => '<li><span>' + ({ signup: 'ثبت‌نام', login: 'ورود', logout: 'خروج' }[s.type] || s.type) + '</span><time>' + when(s) + '</time></li>').join('') + '</ul>' : '<div class="muted">—</div>') + '</div>');
@@ -425,6 +427,36 @@ function serviceForm(id) {
     + (v.builtIn ? '<p class="full small muted">این خدمت فرم اختصاصی دارد و قابل حذف نیست؛ می‌توانید عنوان و نمایش آن را تغییر دهید.</p>' : '')
     + '<div class="full err-msg" id="sf-err" role="alert"></div>'
     + '<div class="full actions">' + (id && !v.builtIn ? '<button type="button" class="btn dan" data-a="service-del" data-id="' + esc(id) + '">حذف</button>' : '') + '<button type="button" class="btn" data-a="close">انصراف</button><button type="submit" class="btn pri">ذخیره</button></div></form>', 'modal');
+}
+function recordForm(formId, title, id, fields) {
+  openOverlay(head(title) + '<form id="' + formId + '" class="form" novalidate data-id="' + esc(id) + '">' + fields.map(([name, label, value, type]) =>
+      type === 'area' ? '<label class="full">' + label + '<textarea name="' + name + '">' + esc(value) + '</textarea></label>'
+      : '<label class="' + (type === 'half' || type === 'number' ? '' : 'full') + '">' + label + '<input type="' + (type === 'number' ? 'number' : 'text') + '" name="' + name + '"' + (type === 'number' ? ' min="0" step="1"' : '') + ' value="' + esc(value) + '"></label>').join('')
+    + '<div class="full err-msg" id="' + formId + '-err" role="alert"></div><div class="full actions"><button type="button" class="btn" data-a="close">انصراف</button><button type="submit" class="btn pri">ذخیره</button></div></form>', 'modal');
+}
+function orderForm(id) { const o = DB.orders.find(x => String(x.id) === String(id)); if (!o) return;
+  recordForm('of', 'ویرایش سفارش <span class="ltr num">' + esc(o.id) + '</span>', o.id, [['addrTitle', 'عنوان آدرس', o.addrTitle, 'half'], ['delivery', 'زمان تحویل', o.delivery, 'half'], ['addrText', 'آدرس تحویل', o.addrText, 'area'], ['note', 'یادداشت سفارش', o.note, 'area']]); }
+function requestForm(id) { const r = DB.serviceRequests.find(x => String(x.id) === String(id)); if (!r) return;
+  recordForm('rf', 'ویرایش درخواست <span class="ltr num">' + esc(r.id) + '</span>', r.id, r.kind === 'used'
+    ? [['price', 'قیمت پیشنهادی (تومان)', r.price || '', 'number'], ['desc', 'توضیحات', r.desc, 'area']]
+    : [['delivery', 'زمان تحویل', r.delivery, 'full'], ['notes', 'یادداشت', r.notes, 'area']]); }
+function userForm(id) { const u = DB.users.find(x => x.id === id); if (!u) return;
+  const parts = String(u.name || '').split(' ');
+  recordForm('uf', 'ویرایش کاربر', u.id, [['firstName', 'نام', u.firstName || parts[0] || '', 'half'], ['lastName', 'نام خانوادگی', u.lastName || parts.slice(1).join(' '), 'half']]);
+  $('#uf').insertAdjacentHTML('afterbegin', '<p class="full small muted" style="margin:0">تلفن <span class="ltr num">' + esc(u.phone) + '</span> شناسهٔ کاربر است و قابل تغییر نیست.</p>'); }
+async function saveRecord(form) {
+  const f = new FormData(form), id = form.dataset.id, body = {};
+  for (const [k, v] of f.entries()) body[k] = typeof v === 'string' ? v.trim() : v;
+  if (form.id === 'of') {
+    if (await write('PATCH', 'orders', id, body)) { logAdmin('ویرایش سفارش', { id }); closeOverlay(true); toast('سفارش ذخیره شد'); render(); showOrder(id); }
+  } else if (form.id === 'rf') {
+    if ('price' in body) { const n = Math.round(+body.price); if (!(n >= 0)) { $('#rf-err').textContent = 'قیمت نامعتبر است'; return; } body.price = n; }
+    if (await write('PATCH', 'serviceRequests', id, body)) { logAdmin('ویرایش درخواست', { id }); closeOverlay(true); toast('درخواست ذخیره شد'); render(); showRequest(id); }
+  } else if (form.id === 'uf') {
+    if (body.firstName.length < 2 || body.lastName.length < 2) { $('#uf-err').textContent = 'نام و نام خانوادگی را وارد کنید'; return; }
+    body.name = body.firstName + ' ' + body.lastName;
+    if (await write('PATCH', 'users', id, body)) { logAdmin('ویرایش کاربر', { id }); closeOverlay(true); toast('کاربر ذخیره شد'); render(); showCustomer(id); }
+  }
 }
 function confirmBox(text, action, id) {
   openOverlay(head('تأیید') + '<p>' + text + '</p><div class="actions"><button class="btn" data-a="close">انصراف</button><button class="btn dan" data-a="' + action + '" data-id="' + esc(id || '') + '">بله، انجام شود</button></div>', 'modal');
@@ -484,6 +516,15 @@ const ACTIONS = {
   'product-del-ok': async (el) => { if (await write('DELETE', 'products', el.dataset.id)) { logAdmin('حذف محصول', { id: el.dataset.id }); closeOverlay(); toast('محصول حذف شد'); render(); } },
   'service-del': (el) => confirmBox('این خدمت حذف شود؟', 'service-del-ok', el.dataset.id),
   'service-del-ok': async (el) => { if (await write('DELETE', 'services', el.dataset.id)) { logAdmin('حذف خدمت', { id: el.dataset.id }); closeOverlay(); toast('خدمت حذف شد'); render(); } },
+  'order-edit': (el) => orderForm(el.dataset.id),
+  'request-edit': (el) => requestForm(el.dataset.id),
+  'user-edit': (el) => userForm(el.dataset.id),
+  'order-del': (el) => confirmBox('سفارش <span class="ltr num">' + esc(el.dataset.id) + '</span> حذف شود؟ از فهرست سفارش‌های مشتری در اپ هم حذف می‌شود. سابقهٔ پرداخت آن (در صورت وجود) برای حسابرسی باقی می‌ماند.', 'order-del-ok', el.dataset.id),
+  'order-del-ok': async (el) => { if (await write('DELETE', 'orders', el.dataset.id)) { logAdmin('حذف سفارش', { id: el.dataset.id }); closeOverlay(); toast('سفارش حذف شد'); render(); } },
+  'request-del': (el) => confirmBox('درخواست <span class="ltr num">' + esc(el.dataset.id) + '</span> حذف شود؟ از فهرست درخواست‌های مشتری در اپ هم حذف می‌شود.', 'request-del-ok', el.dataset.id),
+  'request-del-ok': async (el) => { if (await write('DELETE', 'serviceRequests', el.dataset.id)) { logAdmin('حذف درخواست', { id: el.dataset.id }); closeOverlay(); toast('درخواست حذف شد'); render(); } },
+  'user-del': (el) => confirmBox('کاربر «' + esc((userOf(el.dataset.id) || {}).name || el.dataset.id) + '» حذف شود؟ اگر در اپ وارد شده باشد، از حسابش خارج می‌شود. سفارش‌ها و درخواست‌هایش برای سابقه باقی می‌مانند.', 'user-del-ok', el.dataset.id),
+  'user-del-ok': async (el) => { if (await write('DELETE', 'users', el.dataset.id)) { logAdmin('حذف کاربر', { id: el.dataset.id }); closeOverlay(); toast('کاربر حذف شد'); render(); } },
   export: () => exportDb(),
   reset: () => confirmBox('سفارش‌ها، درخواست‌ها، پرداخت‌ها، کاربران و گزارش‌های همین مرورگر پاک شوند؟ محصولات و خدمات باقی می‌مانند.', 'reset-ok'),
   'reset-ok': () => { const m = readMirror(); ['users','sessions','carts','wishlists','addressBooks','orders','payments','serviceRequests','activity'].forEach(c => { m[c] = []; });
@@ -498,7 +539,7 @@ function render() {
   if (focusQ) { const q = $('#q'); if (q) { q.focus(); try { q.setSelectionRange(sel, sel); } catch (e) {} } }
   window.scrollTo(0, y);
 }
-function route() { const h = location.hash.slice(1); if (h !== VIEW) { VIEW = h || 'overview'; UI = { q: '', f: 'all' }; } render(); window.scrollTo(0, 0); }
+function route() { closeOverlay(true); const h = location.hash.slice(1); if (h !== VIEW) { VIEW = h || 'overview'; UI = { q: '', f: 'all' }; } render(); window.scrollTo(0, 0); }   // a section change closes any open drawer/modal
 
 document.addEventListener('click', (e) => {
   const el = e.target.closest('[data-a]'); if (!el) return;
@@ -509,7 +550,7 @@ document.addEventListener('keydown', (e) => {
   if ((e.key === 'Enter' || e.key === ' ') && e.target.matches('tr[data-a]')) { e.preventDefault(); ACTIONS[e.target.dataset.a](e.target); }
 });
 document.addEventListener('input', (e) => { if (e.target.id === 'q') { UI.q = e.target.value; render(); } });
-document.addEventListener('submit', (e) => { e.preventDefault(); if (e.target.id === 'pf') saveProduct(e.target); if (e.target.id === 'sf') saveService(e.target); });
+document.addEventListener('submit', (e) => { e.preventDefault(); const id = e.target.id; if (id === 'pf') saveProduct(e.target); else if (id === 'sf') saveService(e.target); else if (id === 'of' || id === 'rf' || id === 'uf') saveRecord(e.target); });
 
 // ---------- sign-in gate (demo) & boot ----------
 function loginView(err) {

@@ -711,15 +711,47 @@ class Component extends DCLogic {
       if (prods.length) this.PRODUCTS = prods.filter(p => p.active !== false).sort(bySort).map(p => this.prodFromDb(p));
       const svcs = (Array.isArray(db.services) ? db.services : []).filter(v => v && v.id && v.title);
       this.SERVICES = (svcs.length ? svcs : this.DEFAULT_SERVICES).slice().sort(bySort);
-      const om = new Map((db.orders || []).map(o => [String(o.id), o])), rm = new Map((db.serviceRequests || []).map(r => [String(r.id), r]));
-      let changed = false;
-      const merge = (rec, d) => { if (d && (d.stage !== rec.stage || d.status !== rec.status)) { changed = true; return { ...rec, stage: d.stage, status: d.status }; } return rec; };
-      const orders = this.state.orders.map(o => merge(o, om.get(String(o.no))));
-      const requests = this.state.requests.map(r => merge(r, rm.get(String(r.code))));
+      // ---- the signed-in customer's own records: the database is the source of truth ----
+      // (admin edits/deletes reach the app; with server.js the same account sees its records on any device)
+      const st = this.state, uid = st.loggedIn ? this.userIdOf(st.phone) : null;
+      let changed = false, patch = {};
+      if (uid) {
+        const users = Array.isArray(db.users) ? db.users : [], me = users.find(u => u.id === uid);
+        if (me) this._dbSeenUser = uid;
+        if (!me && this._dbSeenUser === uid) {           // the admin deleted this account → sign out
+          this._dbSeenUser = null;
+          this.dbAuth('logout', st.phone);
+          this.setState({ loggedIn: false, userName: '', phone: '', catalogRev: (st.catalogRev || 0) + 1 });
+          this.toast('حساب شما توسط پشتیبانی حذف شد');
+          return;
+        }
+        if (me && me.name && me.name !== st.userName) { patch.userName = me.name; this._dbSnap.name = me.name; changed = true; }
+        // a local record missing from the database was deleted by the admin — unless it was just created here
+        // and its upload hasn't been confirmed yet (then keep it for up to 2 minutes)
+        const pending = (r, tag) => !this._dbStored.has(tag) && r.ts && Date.now() - r.ts < 120000;
+        const sync = (localList, dbList, key, toLocal, pfx) => {
+          const mine = (Array.isArray(dbList) ? dbList : []).filter(d => d && d.userId === uid).map(toLocal);
+          const ids = new Set(mine.map(r => String(r[key])));
+          mine.forEach(r => this._dbStored.add(pfx + r[key])); 
+          const keep = localList.filter(r => !ids.has(String(r[key])) && pending(r, pfx + r[key]));
+          const next = mine.concat(keep).sort((a, b) => (b.ts || 0) - (a.ts || 0));
+          if (JSON.stringify(next) !== JSON.stringify(localList)) changed = true;
+          return next;
+        };
+        const strip = (d) => { const { id, userId, phone, customer, createdAt, updatedAt, statusHistory, ...rest } = d; return rest; };
+        patch.orders = sync(st.orders, db.orders, 'no', d => ({ ...strip(d), no: d.id }), 'o:');
+        patch.requests = sync(st.requests, db.serviceRequests, 'code', d => ({ ...strip(d), code: d.id }), 'r:');
+        // records that came from the database are already stored there: never re-POST them
+        patch.orders.forEach(o => this._dbSnap.orders.add(o.no));
+        patch.requests.forEach(r => this._dbSnap.requests.add(r.code));
+        if (!changed) { delete patch.orders; delete patch.requests; }
+      }
       const ids = new Set(this.PRODUCTS.map(p => p.id)), cart = {}, wish = {};
-      Object.keys(this.state.cart).forEach(k => { if (ids.has(k)) cart[k] = this.state.cart[k]; else changed = true; });
-      Object.keys(this.state.wish).forEach(k => { if (ids.has(k)) wish[k] = this.state.wish[k]; else changed = true; });
-      this.setState({ catalogRev: (this.state.catalogRev || 0) + 1, ...(changed ? { orders, requests, cart, wish } : {}) });
+      let cartChanged = false;
+      Object.keys(st.cart).forEach(k => { if (ids.has(k)) cart[k] = st.cart[k]; else cartChanged = true; });
+      Object.keys(st.wish).forEach(k => { if (ids.has(k)) wish[k] = st.wish[k]; else cartChanged = true; });
+      if (cartChanged) Object.assign(patch, { cart, wish });
+      this.setState({ catalogRev: (st.catalogRev || 0) + 1, ...patch });
     };
     if (this._dbOnline) fetch(this.DB_API + '/db', { cache: 'no-store' }).then(r => (r.ok ? r.json() : null)).then(apply).catch(() => {});
     else apply(this.dbMirror());
@@ -743,6 +775,7 @@ class Component extends DCLogic {
     else this.dbPull();
   }
   dbInit() {
+    this._dbStored = new Set();   // 'o:<no>' / 'r:<code>' confirmed written to the database this session
     // only probe where server.js can be running: not file://, not static hosting (GitHub Pages)
     const httpish = /^https?:$/.test(location.protocol) && !/\.github\.io$/.test(location.hostname);
     this._dbOnline = false;
@@ -789,7 +822,7 @@ class Component extends DCLogic {
       if (now.addr !== prev.addr) this.dbLog('address.update', { count: s.addresses.length });
     }
     s.orders.filter(o => !prev.orders.has(o.no)).forEach(o => {
-      this.dbWrite('POST', 'orders', null, { ...o, id: o.no, userId, phone: s.phone, customer: s.userName });
+      this.dbWrite('POST', 'orders', null, { ...o, id: o.no, userId, phone: s.phone, customer: s.userName }).then(res => { if (res || !this._dbOnline) this._dbStored.add('o:' + o.no); });
       if (o.payRef) {
         this.dbWrite('POST', 'payments', null, { id: o.payRef, orderNo: o.no, userId, amount: o.total, currency: 'IRT', method: 'online', status: 'paid', cardMasked: o.payCard, at: new Date(o.ts).toISOString() });
         this.dbLog('payment.success', { orderNo: o.no, ref: o.payRef, amount: o.total });
@@ -797,7 +830,7 @@ class Component extends DCLogic {
       this.dbLog('order.place', { no: o.no, total: o.total });
     });
     s.requests.filter(r => !prev.requests.has(r.code)).forEach(r => {
-      this.dbWrite('POST', 'serviceRequests', null, { ...r, id: r.code, userId, phone: s.phone, customer: s.userName });
+      this.dbWrite('POST', 'serviceRequests', null, { ...r, id: r.code, userId, phone: s.phone, customer: s.userName }).then(res => { if (res || !this._dbOnline) this._dbStored.add('r:' + r.code); });
       this.dbLog('service.request', { code: r.code, kind: r.kind });
     });
     if (s.loggedIn && userId && now.name !== prev.name && prev.owner === owner) {
@@ -1260,6 +1293,7 @@ class Component extends DCLogic {
       phone: pretty, authErr: '', otp: '', resendIn: 0, pendingSubmit: null
     }, () => {
       this.dbAuth('login', pretty, { firstName: this.state.authFirst.trim(), lastName: this.state.authLast.trim(), name: this.state.userName });
+      setTimeout(() => this.dbPull(), 400);   // load this account's orders/requests (e.g. from another device)
       this.toast('با موفقیت وارد شدید');
       if (pending === 'refill') this.completeRefill();
       else if (pending === 'used') this.completeUsed();

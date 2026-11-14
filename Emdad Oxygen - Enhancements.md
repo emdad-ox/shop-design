@@ -200,3 +200,16 @@ Changes from the handwritten review notes ("10.13 Nov milad-amin"):
   - The app refreshes on focus, on changes from another tab, and every 15 seconds.
 - **`db.json` and `server.js`:** new `products` and `services` collections, seeded with the current catalogue (8 products, 2 services).
 - **Demo admin password:** `emdad-admin`. It's a client-side gate, not real security.
+
+## Update — full edit and delete in the dashboard, shared records in the app (branch `prototype`)
+- **Dashboard:**
+  - products and services: add, edit and delete (built-in services can be renamed or hidden)
+  - **users:** list, edit the name, delete
+  - **orders:** edit address, delivery time and note; delete (the payment record is kept for accounting)
+  - **service requests:** edit details, delete
+  - changing section (for example with the browser's Back button) now closes any open drawer
+- **App:**
+  - **Records from the database.** For a signed-in customer, the profile name, orders and service requests now load from the database, so admin edits and deletions show immediately. With the server, the same account sees its records on a second device.
+  - **Deleted accounts.** If an admin deletes the account, the app signs the customer out.
+  - **Grace period.** A record the app hasn't confirmed as saved is kept for up to 2 minutes, so it isn't mistaken for a deletion while it uploads.
+  - **Privacy.** Customers see only their own data.
