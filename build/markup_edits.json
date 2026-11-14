@@ -706,5 +706,11 @@
     "find": "font-family:Vazirmatn,system-ui,sans-serif;font-size:14px",
     "replace": "font-family:Vazir,Vazirmatn,system-ui,sans-serif;font-size:14px",
     "count": 1
+  },
+  {
+    "what": "HOME tile: 'فروش تجهیزات' → 'تعمیر تجهیزات' (+ subtitle)",
+    "find": "<div style=\"font-weight:800;font-size:13.5px\">فروش تجهیزات</div>\n          <div style=\"font-size:11px;color:var(--tx2);margin-top:2px\">تجهیزات خود را به ما بفروشید</div>",
+    "replace": "<div style=\"font-weight:800;font-size:13.5px\">تعمیر تجهیزات</div>\n          <div style=\"font-size:11px;color:var(--tx2);margin-top:2px\">تجهیزات خود را به ما بسپارید</div>",
+    "count": 1
   }
 ]
