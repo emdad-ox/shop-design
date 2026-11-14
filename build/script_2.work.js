@@ -4,6 +4,8 @@ class Component extends DCLogic {
     route: 'home', theme: null, pid: null, qty: 1, cart: {}, wish: {},
     cat: 'all', q: '', inStock: false, sort: 'new', sheet: false,
     inqSheet: false, inqPid: null,
+    contactOpen: false, rfTimeOpen: false,   // notes 13-Nov: contact sheet (#9/#10), refill delivery-time sheet (#8)
+    authFirst: '', authLast: '',             // notes 13-Nov #13: login collects first + last name
     disc: null, discInput: '', discErr: '',
     addrId: 1, phone: '', note: '',
     addresses: [
@@ -61,7 +63,7 @@ class Component extends DCLogic {
 
   CATS = [
     { id:'all', label:'همه' },
-    { id:'cyl', label:'کپسول گاز' },
+    { id:'cyl', label:'کپسول طبی' },
     { id:'dev', label:'دستگاه‌ها' },
     { id:'acc', label:'لوازم جانبی' }
   ];
@@ -100,7 +102,7 @@ class Component extends DCLogic {
     try { history.replaceState({ eoRoute: this.state.route, pid: this.state.pid }, ''); } catch (e) {}
     this._lastRoute = this.state.route; this._lastOverlay = false;
     this._onPop = (e) => {
-      if (this.state.sheet || this.state.addrSheet || this.state.inqSheet) { this._navSource = 'pop'; this.closeOverlays(); return; }
+      if (this.state.sheet || this.state.addrSheet || this.state.inqSheet || this.state.contactOpen || this.state.rfTimeOpen) { this._navSource = 'pop'; this.closeOverlays(); return; }
       const st = e.state || {};
       this._navSource = 'pop';
       let to = st.eoRoute || 'home';
@@ -109,12 +111,6 @@ class Component extends DCLogic {
       this.go({ route: to, pid: st.pid });
     };
     window.addEventListener('popstate', this._onPop);
-    // live-follow a system light/dark switch while the user hasn't chosen a theme
-    try {
-      this._mq = matchMedia('(prefers-color-scheme: dark)');
-      this._onScheme = () => { if (!this.state.theme) this.setState({}); };
-      this._mq.addEventListener('change', this._onScheme);
-    } catch (e) {}
     this.loadGsap();
     this.manageMaps();
     this.manageSheetA11y();
@@ -181,7 +177,7 @@ class Component extends DCLogic {
     }
     // Opening a bottom-sheet pushes a disposable history entry so hardware Back closes the sheet
     // instead of leaving the route (P3 overlay layer).
-    const ovNow = !!(this.state.sheet || this.state.addrSheet || this.state.inqSheet);
+    const ovNow = !!(this.state.sheet || this.state.addrSheet || this.state.inqSheet || this.state.contactOpen || this.state.rfTimeOpen);
     if (ovNow && !this._lastOverlay && this._navSource !== 'pop') { try { history.pushState({ eoRoute: this.state.route, pid: this.state.pid, overlay: true }, ''); } catch (e) {} }
     this._lastOverlay = ovNow;
     this._lastRoute = this.state.route;
@@ -199,7 +195,6 @@ class Component extends DCLogic {
     if (this._hydrated) this.persist();
   }
   componentWillUnmount() {
-    if (this._mq && this._onScheme) this._mq.removeEventListener('change', this._onScheme);
     document.removeEventListener('keydown', this._onKey);
     if (this._onScroll) window.removeEventListener('scroll', this._onScroll);
     if (this._onPop) window.removeEventListener('popstate', this._onPop);
@@ -553,10 +548,8 @@ class Component extends DCLogic {
   }
 
   theme() {
-    if (this.state.theme) return this.state.theme;
-    // Apple default: follow the system appearance until the user explicitly picks a theme
-    try { if (window.matchMedia) return matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light'; } catch (e) {}
-    return this.props.defaultTheme ?? 'light';
+    // notes 13-Nov #5: LIGHT is the fixed default; dark only when the user explicitly switches
+    return this.state.theme || 'light';
   }
   applyTheme() {
     document.body.dataset.theme = this.theme();
@@ -619,7 +612,7 @@ class Component extends DCLogic {
     if (!r) return {};
     const st = this.stepperVM(r.kind, r.ts);
     return {
-      rdKind: r.kind === 'refill' ? 'شارژ کپسول گاز' : 'فروش دست دوم',
+      rdKind: r.kind === 'refill' ? 'شارژ کپسول گاز' : 'فروش تجهیزات',
       rdCode: r.code, rdDate: r.date,
       rdDelivery: r.delivery || '', rdHasDelivery: !!(r.kind === 'refill' && r.delivery),
       rdGas: r.gas || '', rdHasGas: !!r.gas,
@@ -629,6 +622,17 @@ class Component extends DCLogic {
       rdChipStyle: st.chipStyle, rdChipText: st.chipText, rdStageLabel: st.stageLabel, rdStepLabel: st.stepLabel,
     };
   }
+  // ---------- contact sheet (notes 13-Nov #9/#10) ----------
+  // Shown by the support button. Edit these values to match the official Emdad Oxygen website.
+  // TODO(content): the street address could not be fetched from the website in this session —
+  // replace `address` (and optionally `mapQuery` with exact coordinates "lat,lng").
+  CONTACT = {
+    tel: '+989191002030', phoneLabel: '۰۹۱۹ ۱۰۰ ۲۰۳۰',
+    address: 'تهران — نشانی دقیق از طریق تماس تلفنی',
+    hours: 'پاسخگویی شبانه‌روزی، ۷ روز هفته',
+    mapQuery: 'امداد اکسیژن تهران',
+  };
+
   // ---------- delivery scheduling (P7) ----------
   SLOTS = [['s1', '۹ تا ۱۲'], ['s2', '۱۲ تا ۱۵'], ['s3', '۱۵ تا ۱۸'], ['s4', '۱۸ تا ۲۱']];
   slotLabel(k) { const f = this.SLOTS.find(x => x[0] === k); return f ? f[1] : ''; }
@@ -650,11 +654,10 @@ class Component extends DCLogic {
   SLOT_START = { s1: 9, s2: 12, s3: 15, s4: 18 };
   slotPast(day, key) { return day === 0 && new Date().getHours() >= this.SLOT_START[key]; }
   // the slot actually in effect: the chosen one if still open, else the first open slot that day
-  effSlot(day, slot) {
-    if (slot && !this.slotPast(day, slot)) return slot;
-    const f = this.SLOTS.find(sl => !this.slotPast(day, sl[0]));
-    return f ? f[0] : '';
-  }
+  // the slot actually in effect: only an explicitly chosen slot that is still open (delivery time is
+  // OPTIONAL — notes 13-Nov #11 — so nothing is preselected; '' means "coordinate by phone")
+  effSlot(day, slot) { return slot && !this.slotPast(day, slot) ? slot : ''; }
+  deliveryOrPhone(day, slot) { const k = this.effSlot(day, slot); return k ? this.deliveryLabel(day, k) : 'هماهنگی تلفنی'; }
   ctaStyle(bg, fg, busy) {
     return 'pointer-events:' + (busy ? 'none' : 'auto') + ';display:flex;align-items:center;justify-content:center;width:100%;height:50px;border:none;border-radius:999px;background:'
       + bg + ';color:' + fg + ';font-weight:800;font-size:14.5px;cursor:' + (busy ? 'default' : 'pointer')
@@ -924,6 +927,8 @@ class Component extends DCLogic {
     const s = this.state;
     if (s.addrSheet) this.setState({ addrSheet: null, addrSheetTarget: null });
     else if (s.inqSheet) this.setState({ inqSheet: false, inqPid: null });
+    else if (s.contactOpen) this.setState({ contactOpen: false });
+    else if (s.rfTimeOpen) this.setState({ rfTimeOpen: false });
     else if (s.sheet) this.setState({ sheet: false });
     else if (s.addrMenuId != null) this.setState({ addrMenuId: null });
   }
@@ -1018,6 +1023,8 @@ class Component extends DCLogic {
 
   // ---------- auth ----------
   goAuthFor(returnRoute, from, pending, step) {
+    const known = (this.state.userName && this.state.userName !== 'کاربر امداد اکسیژن') ? this.state.userName.split(' ') : null;
+    if (known && !this.state.authFirst) this.setState({ authFirst: known[0] || '', authLast: known.slice(1).join(' ') });
     this.go({ route: 'auth', authStep: step || 'phone', otp: '', authErr: '', authReturn: returnRoute, authFrom: from, pendingSubmit: pending || null });
     if (step === 'code') this.startCountdown();
   }
@@ -1030,6 +1037,7 @@ class Component extends DCLogic {
     }, 1000);
   }
   sendOtp = () => {
+    if (this.state.authFirst.trim().length < 2 || this.state.authLast.trim().length < 2) { this.setState({ authErr: 'نام و نام خانوادگی را وارد کنید' }); return; }
     if (!this.validPhone(this.state.authPhone)) { this.setState({ authErr: 'شماره موبایل معتبر ایران وارد کنید (مثلاً 09123456789)' }); return; }
     this.setState({ authStep: 'code', authErr: '', otp: '' });
     this.startCountdown();
@@ -1044,7 +1052,7 @@ class Component extends DCLogic {
     const pretty = '0' + phone.slice(-10, -7) + ' ' + phone.slice(-7, -4) + ' ' + phone.slice(-4);
     const pending = this.state.pendingSubmit;
     this.setState({
-      loggedIn: true, userName: this.state.userName || 'کاربر امداد اکسیژن',
+      loggedIn: true, userName: (this.state.authFirst.trim() + ' ' + this.state.authLast.trim()).trim() || this.state.userName || 'کاربر امداد اکسیژن',
       phone: pretty, authErr: '', otp: '', resendIn: 0, pendingSubmit: null
     }, () => {
       this.toast('با موفقیت وارد شدید');
@@ -1061,7 +1069,7 @@ class Component extends DCLogic {
     if (!this.commitGuard()) return;
     const c = this.code('RC');
     this.go({
-      requests: [{ kind: 'refill', code: c, date: this.todayFa(), ts: Date.now(), delivery: this.deliveryLabel(this.state.rfDay, this.state.rfSlot), gas: this.state.rfGas, notes: this.state.rfNotes }, ...this.state.requests],
+      requests: [{ kind: 'refill', code: c, date: this.todayFa(), ts: Date.now(), delivery: this.deliveryOrPhone(this.state.rfDay, this.state.rfSlot), gas: '', notes: this.state.rfNotes }, ...this.state.requests],
       route: 'formSuccess', fsKind: 'refill', fsCode: c, busy: '',
       rfPhotoList: [], rfGas: '', rfDelivery: '', rfAddr: '', rfNotes: '', rfDay: 0, rfSlot: '', rfErrs: {}
     });
@@ -1097,15 +1105,13 @@ class Component extends DCLogic {
   submitRefill = () => {
     if (this.state.busy) return;
     const s = this.state, errs = {};
-    if (s.rfPhotoList.length < 1) errs.photos = 'حداقل یک تصویر از کپسول اضافه کنید';
-    if (!s.rfGas) errs.gas = 'نوع گاز را انتخاب کنید';
+    // notes 13-Nov: photo optional (#7), gas type removed (#6), delivery time optional (#8/#11),
+    // phone field removed — the verified login number is used (#12)
     if (!s.rfDelivery) errs.delivery = 'نوع ارسال را انتخاب کنید';
-    if (!s.rfSlot || this.slotPast(s.rfDay, s.rfSlot)) errs.slot = 'بازهٔ زمانی تحویل را انتخاب کنید';
     if (s.rfDelivery === 'home' && !s.loggedIn && s.rfAddr.trim().length < 10) errs.addr = 'آدرس کامل تحویل را وارد کنید';
-    if (!this.validPhone(s.rfPhone)) errs.phone = 'شماره موبایل معتبر وارد کنید';
     this.setState({ rfErrs: errs });
     if (Object.keys(errs).length) { this.toast('لطفاً موارد مشخص‌شده را تکمیل کنید'); this.revealFirstError(); return; }
-    if (!s.loggedIn) { this.setState({ authPhone: s.rfPhone }); this.goAuthFor('refill', 'refill', 'refill', 'code'); this.toast('کد تأیید به ' + s.rfPhone + ' پیامک شد'); return; }
+    if (!s.loggedIn) { this.goAuthFor('refill', 'refill', 'refill'); this.toast('برای ثبت درخواست، ابتدا وارد شوید'); return; }
     this.setState({ busy: 'refill' });
     this._busyT = setTimeout(() => this.completeRefill(), 850);
   };
@@ -1113,15 +1119,13 @@ class Component extends DCLogic {
     if (this.state.busy) return;
     const s = this.state, errs = {};
     const price = parseInt(this.deFa(s.usPrice) || '0', 10);
-    if (s.usPhotoList.length < 1) errs.photos = 'حداقل یک تصویر از محصول اضافه کنید';
     if (!price || price <= 0) errs.price = 'قیمت پیشنهادی را به تومان وارد کنید';
-    if (!this.validPhone(s.usPhone)) errs.phone = 'شماره موبایل معتبر وارد کنید';
     const dl = s.usDesc.trim().length;
     if (dl < 10) errs.desc = 'توضیحات حداقل ۱۰ کاراکتر باشد';
     if (dl > 1000) errs.desc = 'توضیحات حداکثر ۱۰۰۰ کاراکتر است';
     this.setState({ usErrs: errs });
     if (Object.keys(errs).length) { this.toast('لطفاً موارد مشخص‌شده را تکمیل کنید'); this.revealFirstError(); return; }
-    if (!s.loggedIn) { this.setState({ authPhone: s.usPhone }); this.goAuthFor('usedSale', 'usedSale', 'used', 'code'); this.toast('کد تأیید به ' + s.usPhone + ' پیامک شد'); return; }
+    if (!s.loggedIn) { this.goAuthFor('usedSale', 'usedSale', 'used'); this.toast('برای ثبت درخواست، ابتدا وارد شوید'); return; }
     this.setState({ busy: 'used' });
     this._busyT = setTimeout(() => this.completeUsed(), 850);
   };
@@ -1180,9 +1184,6 @@ class Component extends DCLogic {
   placeOrder = () => {
     if (this.state.busy) return;
     if (!this.cartTotals().count) { this.go({ route: 'cart' }); return; }
-    const slot = this.effSlot(this.state.coDay, this.state.coSlot);
-    if (!slot) { this.toast('برای این روز بازهٔ آزادی نمانده — روز دیگری انتخاب کنید'); return; }
-    if (slot !== this.state.coSlot) this.setState({ coSlot: slot });
     if (!this.commitGuard()) return;
     this.setState({ busy: 'order' });                 // show loading, then commit (simulated server round-trip)
     this._busyT = setTimeout(() => this._commitOrder(), 850);
@@ -1202,7 +1203,7 @@ class Component extends DCLogic {
       no, date: this.todayFa(), ts: Date.now(), count: t.count,
       subtotal: t.subtotal, disc: t.disc, discCode: s.disc || '', total: t.total,
       items, note: s.note || '', addrTitle: addr ? addr.title : '', addrText: addr ? addr.text : '',
-      delivery: this.deliveryLabel(s.coDay, this.effSlot(s.coDay, s.coSlot))
+      delivery: this.deliveryOrPhone(s.coDay, s.coSlot)
     };
     // Land on the itemized order-detail page (odFresh → shows the success moment), NOT the orders list.
     this.go({
@@ -1378,7 +1379,7 @@ class Component extends DCLogic {
     const hasBottomCta = (route === 'cart' && t.count > 0) || route === 'checkout' || (route === 'detail' && (curVm.canAdd || curVm.out)) || route === 'refill' || route === 'usedSale' || route === 'services';
     // Support pill shows only on the three browse pages (no bottom CTA to compete with); hidden elsewhere.
     const showFab = route === 'home' || route === 'products' || route === 'profile';
-    const fabStyle = 'position:fixed;z-index:45;inset-inline-end:16px;bottom:calc(' + (hasBottomCta ? '150px' : '86px') + ' + env(safe-area-inset-bottom));height:46px;padding:0 15px;border-radius:999px;background:var(--grad-cta);color:#fff;display:inline-flex;align-items:center;gap:8px;box-shadow:0 12px 26px -6px var(--glow);text-decoration:none;font-size:12px;font-weight:600;white-space:nowrap' + (showFab ? '' : ';display:none');
+    const fabStyle = 'border:none;cursor:pointer;font-family:inherit;position:fixed;z-index:45;inset-inline-end:16px;bottom:calc(' + (hasBottomCta ? '150px' : '86px') + ' + env(safe-area-inset-bottom));height:46px;padding:0 15px;border-radius:999px;background:var(--grad-cta);color:#fff;display:inline-flex;align-items:center;gap:8px;box-shadow:0 12px 26px -6px var(--glow);text-decoration:none;font-size:12px;font-weight:600;white-space:nowrap' + (showFab ? '' : ';display:none');
 
     // Toast rides above whatever owns the bottom edge on this route (CTA bar / services card / pill / nav).
     const toastBottom = route === 'services' ? 188 : hasBottomCta ? 150 : showFab ? 142 : 88;
@@ -1514,6 +1515,8 @@ class Component extends DCLogic {
       // auth
       authPhoneStep: s.authStep === 'phone', authCodeStep: s.authStep === 'code',
       authPhone: s.authPhone, onAuthPhone: (e) => this.setState({ authPhone: this.deFa(e.target.value), authErr: '' }),
+      authFirst: s.authFirst, onAuthFirst: (e) => this.setState({ authFirst: e.target.value, authErr: '' }),
+      authLast: s.authLast, onAuthLast: (e) => this.setState({ authLast: e.target.value, authErr: '' }),
       otp: s.otp, onOtp: (e) => { const v = e.target.value.slice(0, 6); this.setState({ otp: v, authErr: '' }, () => { if (this.deFa(v).length === 6) this.verifyOtp(); }); },
       authErr: s.authErr,
       sendOtp: this.sendOtp, verifyOtp: this.verifyOtp,
@@ -1532,7 +1535,7 @@ class Component extends DCLogic {
       rfErrPhotos: s.rfErrs.photos || '', rfErrGas: s.rfErrs.gas || '', rfErrDelivery: s.rfErrs.delivery || '',
       rfErrAddr: s.rfErrs.addr || '', rfErrPhone: s.rfErrs.phone || '', rfErrSlot: s.rfErrs.slot || '',
       rfDays: [0, 1, 2, 3].map(off => { const d = this.dayLabel(off); return { key: off, label: d.name, sub: d.date, style: this.dayChipStyle(s.rfDay === off), pick: () => this.setState({ rfDay: off }) }; }),
-      rfSlots: this.SLOTS.map(sl => { const past = this.slotPast(s.rfDay, sl[0]); return { key: sl[0], label: sl[1], style: this.slotChipStyle(s.rfSlot === sl[0] && !past, past), pick: () => { if (!past) this.setState({ rfSlot: sl[0], rfErrs: { ...s.rfErrs, slot: '' } }); } }; }),
+      rfSlots: this.SLOTS.map(sl => { const past = this.slotPast(s.rfDay, sl[0]); return { key: sl[0], label: sl[1], style: this.slotChipStyle(s.rfSlot === sl[0] && !past, past), pick: () => { if (!past) this.setState({ rfSlot: s.rfSlot === sl[0] ? '' : sl[0] }); } }; }),
       submitRefill: this.submitRefill,
 
       // used-sale form
@@ -1572,13 +1575,13 @@ class Component extends DCLogic {
 
       // delivery scheduler (P7)
       coDays: [0, 1, 2, 3].map(off => { const d = this.dayLabel(off); return { key: off, label: d.name, sub: d.date, style: this.dayChipStyle(s.coDay === off), pick: () => this.setState({ coDay: off }) }; }),
-      coSlots: this.SLOTS.map(sl => { const past = this.slotPast(s.coDay, sl[0]); return { key: sl[0], label: sl[1], style: this.slotChipStyle(this.effSlot(s.coDay, s.coSlot) === sl[0], past), pick: () => { if (!past) this.setState({ coSlot: sl[0] }); } }; }),
+      coSlots: this.SLOTS.map(sl => { const past = this.slotPast(s.coDay, sl[0]); return { key: sl[0], label: sl[1], style: this.slotChipStyle(this.effSlot(s.coDay, s.coSlot) === sl[0], past), pick: () => { if (!past) this.setState({ coSlot: s.coSlot === sl[0] ? '' : sl[0] }); } }; }),
       successDelivery: s.orders[0] ? (s.orders[0].delivery || '') : '',
 
       ordersList: s.orders.map(o => ({ no: o.no, date: o.date, countLabel: this.fmt(o.count), totalLabel: this.fmt(o.total), delivery: o.delivery || 'هماهنگی تلفنی', open: () => this.go({ route: 'orderDetail', odId: o.no, odFresh: false }), ...this.stepperVM('order', o.ts) })),
       ordersEmpty: s.orders.length === 0,
       requestsList: s.requests.map(r => ({
-        kindLabel: r.kind === 'refill' ? 'شارژ کپسول گاز' : 'فروش دست دوم',
+        kindLabel: r.kind === 'refill' ? 'شارژ کپسول گاز' : 'فروش تجهیزات',
         code: r.code, date: r.date, delivery: r.delivery || '', showDelivery: !!(r.kind === 'refill' && r.delivery),
         open: () => this.go({ route: 'requestDetail', rqCode: r.code }), ...this.stepperVM(r.kind, r.ts)
       })),
@@ -1597,6 +1600,13 @@ class Component extends DCLogic {
 
       toastShow: s.toastShow, toastMsg: s.toastMsg,
       fabStyle, toastWrapStyle,
+      contactOpen: s.contactOpen, openContact: () => this.setState({ contactOpen: true }), closeContact: () => this.setState({ contactOpen: false }),
+      contactAddress: this.CONTACT.address, contactHours: this.CONTACT.hours, contactPhoneLabel: this.CONTACT.phoneLabel,
+      contactTelHref: 'tel:' + this.CONTACT.tel, contactCallLabel: 'تماس با ' + this.CONTACT.phoneLabel,
+      contactMapUrl: 'https://www.google.com/maps/search/?api=1&query=' + encodeURIComponent(this.CONTACT.mapQuery),
+      rfTimeOpen: s.rfTimeOpen, openRfTime: () => this.setState({ rfTimeOpen: true }), closeRfTime: () => this.setState({ rfTimeOpen: false }),
+      clearRfTime: () => this.setState({ rfSlot: '', rfDay: 0, rfTimeOpen: false }),
+      rfTimeLabel: this.effSlot(s.rfDay, s.rfSlot) ? this.deliveryLabel(s.rfDay, s.rfSlot) : 'انتخاب زمان — یا هماهنگی تلفنی',
       navPillStyle,
       navs
     };

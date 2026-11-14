@@ -132,3 +132,19 @@ The UI now follows the iOS Human Interface Guidelines, with Liquid-Glass-style m
 - **Appearance.** The theme follows the system light/dark setting live until the user chooses one, as Apple apps do.
 - **Accessibility.** With Reduce Transparency on, or in browsers without `backdrop-filter`, the glass materials become solid surfaces.
 - **Persian note.** Apple's negative tracking on titles is deliberately not applied, because letter-spacing breaks the joined letters of Arabic script. Vazirmatn stays the bundled font so the file still works offline.
+
+## Update — review notes of 13 Nov (branch `prototype`)
+Changes from the handwritten review notes ("10.13 Nov milad-amin"):
+1. **Apple system design:** already in place from the earlier glass pass.
+2. **Wording:** "second-hand" (دست دوم) becomes "equipment" (تجهیزات) everywhere: «فروش تجهیزات».
+3. **Home:** the shop (featured products) moves to the end of the page, after «چرا امداد اکسیژن؟».
+4. **Category:** «کپسول گاز» is renamed «کپسول طبی».
+5. **Theme:** light is the fixed default; dark appears only when the user switches to it.
+6. **Refill form:** the gas-type field is removed.
+7. **Photos:** optional on the refill and equipment-sale forms.
+8. **Refill delivery time:** chosen in a pop-up from an optional "Delivery time" row; the row shows the chosen time.
+9. **Contact pop-up:** the support button opens a pop-up instead of dialing directly.
+10. **Pop-up content:** a directions button, the address between, then a call button, with the number shown underneath. The contact details are in the `CONTACT` constant in `script_2.work.js`. **The street address is a placeholder** until the official address from the Emdad Oxygen website is supplied.
+11. **Delivery time optional:** in checkout and in refill. With no time chosen, the record says «هماهنگی تلفنی»; tapping the chosen slot again clears it.
+12. **Phone fields:** removed from refill, equipment sale and checkout. Submitting requires login, and the verified login number is used.
+13. **Login:** also asks for first and last name; both are required and saved as the profile name.
