@@ -105,9 +105,9 @@ div[style*="background:var(--sur)"],div[style*="background: var(--sur)"]{ box-sh
 div[style*="background:var(--sur2)"],div[style*="background: var(--sur2)"]{ box-shadow: var(--e0); }
 [style*="z-index:40"],[style*="z-index: 40"]{ box-shadow: 0 -1px 0 var(--line), 0 -10px 30px -14px rgba(36,28,64,.20) !important; }
 button[style*="var(--p)"]:not([disabled]){box-shadow:0 10px 26px -12px var(--glow)}
-body{font-family:Vazirmatn,system-ui,sans-serif}   /* body-level so runtime overlays (#eo-splash, toasts) never fall back to serif */
+body{font-family:Vazir,Vazirmatn,system-ui,sans-serif}   /* body-level so runtime overlays (#eo-splash, toasts) never fall back to serif */
 input,textarea,button,select{font-family:inherit}
-h1,h2{font-family:Vazirmatn,system-ui,sans-serif;letter-spacing:normal;line-height:1.4}
+h1,h2{font-family:Vazir,Vazirmatn,system-ui,sans-serif;letter-spacing:normal;line-height:1.4}
 button{transition:transform .16s ease, box-shadow .24s ease, background .2s ease, border-color .2s ease}
 button:active{transform:translateY(1px)}
 ::placeholder{color:var(--tx2);opacity:.8}
@@ -135,7 +135,7 @@ button:active{transform:translateY(1px)}
   --sp-1:4px; --sp-2:8px; --sp-3:12px; --sp-4:16px; --sp-5:20px; --sp-6:24px; --sp-7:32px; --sp-8:40px; --sp-9:48px; --sp-10:64px;
   /* radius — assigned by TIER (inputs/cards/sheets/hero/pill) */
   --r-sm:12px; --r-md:16px; --r-lg:20px; --r-xl:24px; --r-pill:999px;
-  /* type scale (Vazirmatn only) */
+  /* type scale (Vazir; Vazirmatn as fallback) */
   --fs-display:26px; --fs-title:20px; --fs-h:17px; --fs-sub:15px; --fs-body:14px; --fs-sm:13px; --fs-caption:12px; --fs-label:11px;
   --w-display:800; --w-title:700; --w-strong:600; --w-med:500; --w-body:400;
   /* control heights */
@@ -446,7 +446,7 @@ body{ background-attachment: fixed; }
      glass sheets with a grabber, a glass HUD toast, inset-grouped lists with inset separators.
    · Accessibility — honours Reduce Transparency (solid materials) and a no-backdrop fallback.
    Persian note: Apple's negative title tracking is deliberately NOT applied (letter-spacing
-   breaks Arabic-script joining); Vazirmatn stays the bundled face so the file works offline.
+   breaks Arabic-script joining); Vazir is the bundled face (Vazirmatn fallback) so the file works offline.
    ============================================================================ */
 
 /* ---- Material: cards & surfaces ---- */

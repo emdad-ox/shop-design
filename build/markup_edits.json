@@ -700,5 +700,11 @@
     "find": "<label style=\"display:block;font-weight:700;font-size:12.5px;margin-bottom:8px\">شماره موبایل</label>",
     "replace": "<div style=\"display:grid;grid-template-columns:1fr 1fr;gap:10px\">\n          <div><label style=\"display:block;font-weight:700;font-size:12.5px;margin-bottom:8px\">نام</label>\n          <input value=\"{{ authFirst }}\" onchange=\"{{ onAuthFirst }}\" aria-label=\"نام\" autocomplete=\"given-name\" placeholder=\"مثلاً: علی\" style=\"width:100%;height:50px;border:1px solid var(--line);border-radius:14px;background:var(--sur);color:var(--tx);padding:0 16px;font-size:14px;outline:none;margin-bottom:12px\"></div>\n          <div><label style=\"display:block;font-weight:700;font-size:12.5px;margin-bottom:8px\">نام خانوادگی</label>\n          <input value=\"{{ authLast }}\" onchange=\"{{ onAuthLast }}\" aria-label=\"نام خانوادگی\" autocomplete=\"family-name\" placeholder=\"مثلاً: رضایی\" style=\"width:100%;height:50px;border:1px solid var(--line);border-radius:14px;background:var(--sur);color:var(--tx);padding:0 16px;font-size:14px;outline:none;margin-bottom:12px\"></div>\n        </div>\n        <label style=\"display:block;font-weight:700;font-size:12.5px;margin-bottom:8px\">شماره موبایل</label>",
     "count": 1
+  },
+  {
+    "what": "FONT: app root uses Vazir (Vazirmatn as fallback)",
+    "find": "font-family:Vazirmatn,system-ui,sans-serif;font-size:14px",
+    "replace": "font-family:Vazir,Vazirmatn,system-ui,sans-serif;font-size:14px",
+    "count": 1
   }
 ]

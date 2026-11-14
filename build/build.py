@@ -21,6 +21,19 @@ def must_replace(s, old, new, what):
         raise SystemExit(f"BUILD ERROR: '{what}' matched {n} times (expected 1)")
     return s.replace(old, new)
 
+# ---- Bundle the Vazir typeface (offline): @font-face rules with base64 woff2 data are generated at
+# build time and prepended to the app CSS inside the template, so style_3.work.css stays readable.
+import base64
+font_dir = f"{SCRATCH}/font_bundle"
+VAZIR = [("Vazir-Regular.woff2", 400), ("Vazir-Medium.woff2", 500), ("Vazir-Bold.woff2", 700)]
+if all(os.path.exists(f"{font_dir}/{f}") for f, _ in VAZIR):
+    faces = "".join(
+        "@font-face{font-family:Vazir;font-style:normal;font-weight:%d;font-display:swap;"
+        "src:url(data:font/woff2;base64,%s) format('woff2')}\n"
+        % (w, base64.b64encode(open(f"{font_dir}/{f}", "rb").read()).decode()) for f, w in VAZIR)
+    new_css = "/* Vazir v30.1.0 (SIL OFL 1.1, see build/font_bundle/OFL.txt) — bundled offline */\n" + faces + new_css
+    print(f"  bundled Vazir font: {len(faces)} bytes of @font-face")
+
 tmpl = must_replace(tmpl, orig_css, new_css, "style_3.css block")
 tmpl = must_replace(tmpl, orig_js,  new_js,  "script_2.js block")
 

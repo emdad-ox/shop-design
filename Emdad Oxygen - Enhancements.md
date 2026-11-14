@@ -148,3 +148,9 @@ Changes from the handwritten review notes ("10.13 Nov milad-amin"):
 11. **Delivery time optional:** in checkout and in refill. With no time chosen, the record says «هماهنگی تلفنی»; tapping the chosen slot again clears it.
 12. **Phone fields:** removed from refill, equipment sale and checkout. Submitting requires login, and the verified login number is used.
 13. **Login:** also asks for first and last name; both are required and saved as the profile name.
+
+## Update — Vazir typeface (branch `prototype`)
+- The app font is now **Vazir** v30.1.0, by Saber Rastikerdar, under the SIL Open Font License; see `build/font_bundle/OFL.txt`.
+- **Bundled offline.** `build/build.py` builds the `@font-face` rules from `build/font_bundle/*.woff2` (Regular 400, Medium 500, Bold 700; about 130 KB) and adds them in front of the app CSS at build time. No network access is needed.
+- Weight 600 renders with the Bold file.
+- Vazirmatn stays only as the fallback in the font stacks.
