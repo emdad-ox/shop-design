@@ -53,8 +53,13 @@ a{color:var(--p-ink)}
 /* ☰ menu button: first item of the top bar (right side, RTL); the sidebar collapses to zero width (desktop) */
 .burger{flex:none;width:42px;height:42px;border-radius:12px;border:1px solid var(--line);background:var(--sur);color:var(--tx);display:grid;place-items:center;cursor:pointer;box-shadow:var(--shadow);padding:0}
 .burger:hover,.theme-btn:hover{border-color:var(--p)}
-.theme-btn{position:fixed;top:14px;left:14px;z-index:40;width:42px;height:42px;border-radius:12px;border:1px solid var(--line);background:var(--sur);color:var(--tx);display:grid;place-items:center;cursor:pointer;box-shadow:var(--shadow);padding:0}
-.top{padding-left:56px}
+.theme-btn{flex:none;width:42px;height:42px;border-radius:12px;border:1px solid var(--line);background:var(--sur);color:var(--tx);display:grid;place-items:center;cursor:pointer;box-shadow:var(--shadow);padding:0}
+/* top bar, one line: ☰ · title · page actions · refresh · light/dark (RTL: right → left) */
+.top-actions{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+@media (max-width:860px){   /* phones: page actions drop to a second row; the title may shrink/wrap so the row never breaks */
+  .top-actions{order:5;flex-basis:100%}
+  .main .top{gap:8px} .main .top h1{flex:1 1 0;min-width:0;font-size:18px;line-height:1.4}
+}
 .side{overflow-x:hidden;overflow-y:auto;min-width:0}
 .shell.side-hidden{grid-template-columns:0 minmax(0,1fr)}
 .shell.side-hidden .side{padding-inline:0;border-inline-end-width:0;visibility:hidden}
@@ -286,7 +291,6 @@ function shell(title, actions, body) {
   const openOrders = DB.orders.filter(isOpen).length, openReq = DB.serviceRequests.filter(isOpen).length;
   const badge = { orders: openOrders, requests: openReq };
   return '<div class="shell' + (SIDE_HIDDEN ? ' side-hidden' : '') + (SIDE_OPEN ? ' side-open' : '') + '">'
-    + themeBtn()
     + '<div class="side-scrim" data-a="side-close"></div>'
     + '<aside class="side" id="side" aria-label="بخش‌ها"><div class="brand"><div class="logo">O₂</div><div><b>امداد اکسیژن</b><small>پنل مدیریت</small></div></div>'
     + '<nav class="nav">' + NAV.map(([k, l, d]) => '<a href="#' + k + '"' + (VIEW === k ? ' aria-current="page"' : '') + '>' + icon(d) + '<span>' + l + '</span>'
@@ -295,8 +299,8 @@ function shell(title, actions, body) {
     + '<main class="main"><div class="top">'
     + '<button class="burger" type="button" data-a="side-toggle" aria-controls="side" aria-expanded="' + sideShown() + '" aria-label="' + (sideShown() ? 'بستن منو' : 'باز کردن منو') + '">'
     + '<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M4 6h16M4 12h16M4 18h16"></path></svg></button>'
-    + '<h1>' + title + '</h1>' + actions
-    + '<button class="btn sm" data-a="refresh">به‌روزرسانی</button></div>' + body + '</main></div>';
+    + '<h1>' + title + '</h1>' + (actions ? '<div class="top-actions">' + actions + '</div>' : '')
+    + '<button class="btn sm" data-a="refresh">به‌روزرسانی</button>' + themeBtn() + '</div>' + body + '</main></div>';
 }
 function table(cols, rows, click) {
   if (!rows.length) return '<div class="empty">موردی یافت نشد</div>';
