@@ -141,12 +141,12 @@ tbody tr.click{cursor:pointer} tbody tr.click:hover{background:var(--sur2)}
    Data: the same database as the shop app.
      · With server.js running (npm start): reads/writes db.json through /api.
      · Otherwise (GitHub Pages / file://): the browser copy the app keeps (localStorage
-       "emdad:db"), shared by the app and this page on the same site — changes here reach
+       "emdad-prototype:db"), shared by the app and this page on the same site — changes here reach
        the app immediately (and vice versa).
    Sign-in is a client-side demo gate, NOT real security; a production admin needs
    server-side authentication.
    ===================================================================================== */
-const API = '/api', LOCAL = 'emdad:db', ADMIN_PASS = 'emdad-admin';
+const API = 'api', LOCAL = 'emdad-prototype:db', ADMIN_PASS = 'emdad-admin';
 const COLS = ['users','sessions','carts','wishlists','addressBooks','orders','payments','serviceRequests','products','services','activity'];
 const CATS = { cyl: 'کپسول طبی', dev: 'دستگاه‌ها', acc: 'لوازم جانبی' };
 const ARTS = { cyl: 'کپسول', dev: 'دستگاه', mano: 'مانومتر', mask: 'ماسک' };
@@ -504,7 +504,7 @@ function exportDb() {
 const ACTIONS = {
   close: () => closeOverlay(),
   refresh: async () => { await load(); render(); toast('به‌روز شد'); },
-  logout: () => { try { sessionStorage.removeItem('emdad:admin'); } catch (e) {} clearInterval(POLL); boot(); },
+  logout: () => { try { sessionStorage.removeItem('emdad-prototype:admin'); } catch (e) {} clearInterval(POLL); boot(); },
   filter: (el) => { UI.f = el.dataset.f; render(); },
   order: (el) => showOrder(el.dataset.id),
   request: (el) => showRequest(el.dataset.id),
@@ -563,7 +563,7 @@ function loginView(err) {
     + '<div class="err-msg" role="alert">' + (err || '') + '</div><button class="btn pri" style="width:100%;height:46px">ورود</button>'
     + '<div class="hint">نسخهٔ آزمایشی — رمز: <b dir="ltr">' + ADMIN_PASS + '</b><br>این فقط یک دروازهٔ نمایشی است، نه امنیت واقعی.</div></form></div>';
   $('#pw').focus();
-  $('#lf').onsubmit = (e) => { e.preventDefault(); if ($('#pw').value === ADMIN_PASS) { try { sessionStorage.setItem('emdad:admin', '1'); } catch (er) {} start(); } else loginView('رمز نادرست است'); };
+  $('#lf').onsubmit = (e) => { e.preventDefault(); if ($('#pw').value === ADMIN_PASS) { try { sessionStorage.setItem('emdad-prototype:admin', '1'); } catch (er) {} start(); } else loginView('رمز نادرست است'); };
 }
 async function start() {
   ONLINE = await probe(); await load(); VIEW = location.hash.slice(1) || 'overview'; render();
@@ -571,7 +571,7 @@ async function start() {
   window.addEventListener('storage', (e) => { if (e.key === LOCAL && !ONLINE && !$('#ov')) { DB = readMirror(); render(); } });   // live: app activity in another tab
   clearInterval(POLL); POLL = setInterval(async () => { if (ONLINE && !$('#ov') && document.visibilityState === 'visible') { await load(); render(); } }, 10000);
 }
-function boot() { let ok = false; try { ok = sessionStorage.getItem('emdad:admin') === '1'; } catch (e) {} ok ? start() : loginView(); }
+function boot() { let ok = false; try { ok = sessionStorage.getItem('emdad-prototype:admin') === '1'; } catch (e) {} ok ? start() : loginView(); }
 boot();
 </script>
 </body>

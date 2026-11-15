@@ -1,6 +1,8 @@
 #!/usr/bin/env node
 /*
- * Emdad Oxygen — local JSON-DB server (zero dependencies, Node >= 18).
+ * Emdad Oxygen — JSON-DB server (zero dependencies, Node >= 18).
+ *
+ * Serves this folder and reads/writes only ./db.json; the whole site is self-contained.
  *
  *   npm start            # or: node server.js        → http://localhost:3000
  *   PORT=8080 node server.js
@@ -144,6 +146,6 @@ const server = http.createServer((req, res) => {
   } else { res.writeHead(405); res.end(); }
 });
 server.listen(PORT, () => {
-  console.log('Emdad Oxygen shop  → http://localhost:' + PORT + '/');
+  console.log('Emdad Oxygen shop → http://localhost:' + PORT + '/   (admin: /admin.html)');
   console.log('JSON DB            → ' + DB_FILE + '  (API: /api/db, /api/<collection>)');
 });

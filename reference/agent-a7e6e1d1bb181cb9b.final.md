@@ -1,1 +1,0 @@
-Let me nail down the Leaflet integration, the Baloo/PNG UUIDs, and confirm the font embedding story in the template.

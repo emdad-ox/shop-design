@@ -1,11 +1,10 @@
 {
   "name": "emdad-oxygen-shop",
-  "private": true,
   "version": "1.0.0",
-  "description": "Emdad Oxygen shop prototype + local JSON-DB server",
+  "private": true,
+  "description": "Emdad Oxygen shop — app + admin dashboard + db.json",
   "scripts": {
-    "start": "node server.js",
-    "build": "python3 build/build.py"
+    "start": "node server.js"
   },
   "engines": {
     "node": ">=18"
