@@ -63,8 +63,6 @@ a{color:var(--p-ink)}
 .main{min-width:0;padding:22px clamp(16px,3vw,32px) 48px}
 .top{display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:18px}
 .top h1{margin:0;font-size:22px;font-weight:700;flex:1;min-width:180px}
-.src{display:inline-flex;align-items:center;gap:6px;font-size:12px;padding:5px 12px;border-radius:999px;background:var(--sur);border:1px solid var(--line)}
-.src i{width:8px;height:8px;border-radius:999px;background:var(--warn)} .src.on i{background:var(--ok)}
 
 /* ---- components ---- */
 .btn{display:inline-flex;align-items:center;justify-content:center;gap:6px;height:38px;padding:0 16px;border-radius:999px;border:1px solid var(--line);background:var(--sur);cursor:pointer;font-weight:600;text-decoration:none;color:var(--tx);white-space:nowrap}
@@ -297,7 +295,6 @@ function shell(title, actions, body) {
       + (badge[k] ? '<span class="count num">' + fa(badge[k]) + '</span>' : '') + '</a>').join('') + '</nav>'
     + '<div class="foot"><a class="btn sm" href="../shop/" target="_blank" rel="noopener">باز کردن اپلیکیشن ↗</a><button class="btn sm" data-a="logout">خروج از پنل</button></div></aside>'
     + '<main class="main"><div class="top"><h1>' + title + '</h1>' + actions
-    + '<span class="src' + (ONLINE ? ' on' : '') + '" title="' + (ONLINE ? 'سرور محلی: db.json' : 'داده‌های همین مرورگر (مشترک با اپ)') + '"><i></i>' + (ONLINE ? 'متصل به db.json' : 'حالت مرورگر') + '</span>'
     + '<button class="btn sm" data-a="refresh">به‌روزرسانی</button></div>' + body + '</main></div>';
 }
 function table(cols, rows, click) {
