@@ -4,10 +4,10 @@
  *
  * Serves this folder and reads/writes only ./db.json; the whole site is self-contained.
  *
- *   npm start            # or: node server.js        → http://localhost:3000
+ *   npm start            # or: node server.js   → shop: http://localhost:3000/shop/   panel: /panel/
  *   PORT=8080 node server.js
  *
- * Serves the prototype HTML from this folder AND a tiny REST API backed by ./db.json.
+ * Serves shop/ (the app) and panel/ (admin dashboard) AND a tiny REST API backed by ./db.json.
  * Every write is persisted to db.json atomically (temp file + rename), one write at a time.
  *
  * API (all JSON):
@@ -126,14 +126,24 @@ const MIME = { '.html': 'text/html; charset=utf-8', '.json': 'application/json; 
                '.css': 'text/css', '.png': 'image/png', '.jpg': 'image/jpeg', '.svg': 'image/svg+xml', '.woff2': 'font/woff2' };
 function serveStatic(req, res, urlPath) {
   let rel = decodeURIComponent(urlPath);
-  if (rel === '/' ) rel = '/index.html';
-  const file = path.normalize(path.join(ROOT, rel));
+  if (rel === '/') { res.writeHead(302, { Location: '/shop/' }); return res.end(); }   // site root → the shop
+  let file = path.normalize(path.join(ROOT, rel));
   if (!file.startsWith(ROOT + path.sep) || path.basename(file).startsWith('.')) { res.writeHead(403); return res.end(); }
   fs.stat(file, (err, st) => {
+    if (!err && st.isDirectory()) {
+      // a folder (shop/, panel/) serves its index.html; without the trailing slash, redirect so the
+      // pages' relative addresses (../api, ../db.json) resolve from inside the folder
+      if (!rel.endsWith('/')) { res.writeHead(301, { Location: rel + '/' }); return res.end(); }
+      file = path.join(file, 'index.html');
+      return fs.stat(file, (e2, st2) => send200(e2, st2));
+    }
+    send200(err, st);
+  });
+  function send200(err, st) {
     if (err || !st.isFile()) { res.writeHead(404); return res.end('not found'); }
     res.writeHead(200, { 'Content-Type': MIME[path.extname(file)] || 'application/octet-stream', 'Cache-Control': 'no-cache' });
     fs.createReadStream(file).pipe(res);
-  });
+  }
 }
 
 const server = http.createServer((req, res) => {
@@ -146,6 +156,7 @@ const server = http.createServer((req, res) => {
   } else { res.writeHead(405); res.end(); }
 });
 server.listen(PORT, () => {
-  console.log('Emdad Oxygen shop → http://localhost:' + PORT + '/   (admin: /admin.html)');
+  console.log('Emdad Oxygen shop  → http://localhost:' + PORT + '/shop/');
+  console.log('Admin panel       → http://localhost:' + PORT + '/panel/');
   console.log('JSON DB            → ' + DB_FILE + '  (API: /api/db, /api/<collection>)');
 });

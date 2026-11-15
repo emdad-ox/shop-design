@@ -5,15 +5,16 @@ Vazir font and images are inlined, so nothing else is needed.
 
 | File | What it is |
 |---|---|
-| `index.html` | The shop app — demo login code `123456` |
-| `admin.html` | Admin dashboard — password `emdad-admin` |
+| `shop/index.html` | The shop app — demo login code `123456` |
+| `panel/index.html` | Admin dashboard — password `emdad-admin` |
+| `index.html` | Sends visitors from the site root to `shop/` |
 | `db.json` | Database (seed: 8 products, 2 services) |
 | `server.js`, `package.json` | Server for `db.json` (zero dependencies, Node ≥ 18) |
 
 ## Run it
 
 ```bash
-npm start            # → http://localhost:3000/  and  http://localhost:3000/admin.html
+npm start            # → shop: http://localhost:3000/shop/   panel: http://localhost:3000/panel/
 ```
 
 With the server running, every login, order and service request is written to `db.json`, and the
@@ -21,7 +22,7 @@ app and dashboard share it across devices. Without a server (GitHub Pages, or op
 directly) the app and dashboard share data through the browser only (storage keys
 `emdad-prototype:*`).
 
-Public site: https://emdad-ox.github.io/shop-design/ (dashboard: `/admin.html`).
+Public site: https://emdad-ox.github.io/shop-design/shop/ (panel: https://emdad-ox.github.io/shop-design/panel/).
 
 ## Source
 
