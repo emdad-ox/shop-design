@@ -19,6 +19,7 @@
   --acc:#1aa8bd; --acc-soft:#dcf2f5; --acc-ink:#0b6b79;
   --ok:#1e7a37; --ok-soft:#e1f5e6; --warn:#8a5300; --warn-soft:#fdf0d9; --err:#c4001a; --err-soft:#fde4e6;
   --shadow:0 1px 2px rgba(0,0,0,.04),0 8px 24px -14px rgba(40,30,90,.25);
+  --chart:#6250a8; --chart-track:#ece8f8; --grid:rgba(60,60,67,.10);
   --r:16px; --font:Vazir,Vazirmatn,system-ui,-apple-system,"Segoe UI",Tahoma,sans-serif;
   color-scheme:light;
 }
@@ -30,6 +31,7 @@
   --acc:#41d0e2; --acc-soft:#123540; --acc-ink:#7fe3f0;
   --ok:#30d158; --ok-soft:#0f2e1a; --warn:#ffb340; --warn-soft:#3a2a10; --err:#ff6961; --err-soft:#3a1716;
   --shadow:0 1px 2px rgba(0,0,0,.4),0 10px 28px -14px rgba(0,0,0,.8); color-scheme:dark;
+  --chart:#9583e8; --chart-track:#2c2650; --grid:rgba(255,255,255,.08);
 }
 *{box-sizing:border-box}
 html,body{margin:0;background:var(--bg);color:var(--tx);font:14px/1.7 var(--font)}
@@ -108,6 +110,67 @@ tbody tr.click{cursor:pointer} tbody tr.click:hover{background:var(--sur2)}
 .feed time{margin-inline-start:auto;color:var(--tx2);font-size:12px;white-space:nowrap}
 .prod-cell{display:flex;align-items:center;gap:10px}
 .dot{width:10px;height:10px;border-radius:999px;flex:none}
+
+/* ---- overview ---- */
+.ov{display:grid;gap:14px}
+.ic{width:38px;height:38px;border-radius:12px;display:grid;place-items:center;flex:none;background:var(--p-soft);color:var(--p-ink)}
+.ic.acc{background:var(--acc-soft);color:var(--acc-ink)} .ic.ok{background:var(--ok-soft);color:var(--ok)}
+.ic.warn{background:var(--warn-soft);color:var(--warn)} .ic.err{background:var(--err-soft);color:var(--err)} .ic.mute{background:var(--fill);color:var(--tx2)}
+.ic.sm{width:32px;height:32px;border-radius:10px}
+.attn{display:flex;gap:10px;flex-wrap:wrap}
+.attn a,.attn div{flex:1 1 220px;display:flex;align-items:center;gap:10px;padding:10px 12px;border-radius:14px;background:var(--sur);border:1px solid var(--line);color:var(--tx);text-decoration:none;font-size:13.5px}
+.attn a:hover{border-color:var(--p)}
+.attn b{font-size:17px}
+.attn .go{margin-inline-start:auto;color:var(--tx2);font-size:18px;line-height:1}
+.stats{display:grid;gap:12px;grid-template-columns:repeat(4,minmax(0,1fr))}
+.stat{display:flex;align-items:center;gap:12px;padding:14px 16px;text-decoration:none;color:var(--tx);min-width:0}
+a.stat:hover{border-color:var(--p)}
+.stat .l{font-size:12.5px;color:var(--tx2)} .stat .v{font-size:20px;font-weight:700;line-height:1.35}
+.stat .s{font-size:12px;color:var(--tx2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.stat > div{min-width:0}
+.ov-row{display:grid;gap:14px;grid-template-columns:minmax(0,3fr) minmax(0,2fr)}
+.ov-row.even{grid-template-columns:minmax(0,1fr) minmax(0,1fr)}
+.sec-h .sum{font-weight:700;font-size:14px}
+.sep{display:inline-block;width:1px;height:.95em;background:var(--tx2);opacity:.45;margin:0 7px;vertical-align:-.12em}
+.tip span{display:block}
+/* the trend card stretches to its neighbour's height: the chart takes the spare room */
+.trend{display:flex;flex-direction:column} .trend .chart{flex:1;min-height:150px}
+/* column chart: one series, RTL time axis (oldest at the right, today at the left) */
+.chart{position:relative;height:150px;margin-top:8px}
+.chart .gl{position:absolute;inset-inline:0;border-top:1px solid var(--grid)}
+.chart .gl.base{border-top-color:var(--line)}
+.chart .gl span{position:absolute;inset-inline-start:0;top:-9px;font-size:11px;line-height:1;color:var(--tx2);background:var(--sur);padding-inline-end:6px}
+.cols{position:absolute;inset:0;inset-inline-start:64px;display:flex;align-items:flex-end}
+.col{flex:1;height:100%;display:flex;align-items:flex-end;justify-content:center;position:relative;border-radius:6px}
+.col i{display:block;width:min(22px,60%);background:var(--chart);border-radius:4px 4px 0 0}
+.col:hover,.col:focus-visible{background:var(--sur2)} .col:hover i,.col:focus-visible i{filter:brightness(1.12)}
+.col:focus-visible{outline:2px solid var(--p);outline-offset:-2px}
+.tip{display:none;position:absolute;z-index:5;transform:translateX(50%);inset-inline-start:50%;background:var(--sur);border:1px solid var(--line);box-shadow:var(--shadow);border-radius:10px;padding:6px 10px;white-space:nowrap;font-size:12px;color:var(--tx2);pointer-events:none}
+.tip.s{transform:none;inset-inline-start:0} .tip.e{transform:none;inset-inline-start:auto;inset-inline-end:0}
+.tip b{display:block;color:var(--tx);font-size:13px}
+.col:hover .tip,.col:focus-visible .tip{display:block}
+.xl{display:flex;margin-inline-start:64px;margin-top:6px;font-size:11px;color:var(--tx2)}
+.xl span{flex:1;text-align:center;white-space:nowrap}
+.chart-empty{position:absolute;inset:0;inset-inline-start:64px;display:grid;place-items:center;color:var(--tx2);font-size:13px}
+/* status meters: name + count, thin bar below (track = lighter step of the same hue) */
+.pipes{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:18px}
+.pipes h3{margin:0 0 8px;font-size:13px;font-weight:700;color:var(--tx2)}
+.meters{display:grid;gap:9px}
+.meter{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:3px 10px;align-items:center;font-size:13px}
+.meter .bar{grid-column:1/-1;height:8px;border-radius:999px;background:var(--chart-track)}
+.meter .bar i{display:block;height:100%;border-radius:999px;background:var(--chart)}
+.meter.cx .bar i{background:var(--tx2)}
+/* compact lists (latest records, recent activity) */
+.rlist{list-style:none;margin:0;padding:0}
+.rlist li{border-bottom:1px solid var(--line)} .rlist li:last-child{border-bottom:none}
+.rlist .row{display:flex;align-items:center;gap:10px;width:100%;padding:8px 4px;border:0;background:none;color:inherit;font:inherit;text-align:start;border-radius:10px}
+button.row{cursor:pointer} button.row:hover{background:var(--sur2)}
+.rlist .t{flex:1;min-width:0} .rlist .t b{display:block;font-size:13.5px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.rlist .t small{color:var(--tx2);font-size:12px}
+.rlist .e{display:flex;flex-direction:column;align-items:flex-end;gap:3px;font-size:12.5px;white-space:nowrap}
+@media (max-width:1100px){.stats{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media (max-width:1000px){.ov-row,.ov-row.even{grid-template-columns:minmax(0,1fr)}}
+@media (max-width:520px){.pipes{grid-template-columns:minmax(0,1fr)} .stat{padding:12px} .stat .ic{width:34px;height:34px} .stat .v{font-size:18px}}
 
 /* ---- drawer & modal ---- */
 .scrim{position:fixed;inset:0;background:rgba(15,12,40,.45);z-index:50}
@@ -315,24 +378,117 @@ function filterBar(chips) {
 const match = (r, keys) => !UI.q || keys.some(k => String(k ?? '').toLowerCase().includes(UI.q.toLowerCase()) || faD(k).includes(UI.q));
 
 const V = {};
+// ---- overview: what needs attention → headline numbers → revenue trend + status → latest records & activity ----
+const OVI = {
+  money: 'M3 7h18v10H3zM12 10a2 2 0 1 0 0 4 2 2 0 0 0 0-4zM6 10v4M18 10v4',
+  alert: 'M12 4l9 16H3zM12 10v4M12 17h.01',
+  check: 'M5 12.5l4.5 4.5L19 7',
+  shield: 'M12 3l8 3v6c0 4.5-3.4 8-8 9-4.6-1-8-4.5-8-9V6z',
+  search: 'M11 4a7 7 0 1 0 0 14 7 7 0 0 0 0-14zM20 20l-4-4',
+  cart: 'M3 4h2l2.4 11h10.2L20 8H7M10 20h.01M17 20h.01',
+  dot: 'M12 10a2 2 0 1 0 0 4 2 2 0 0 0 0-4z',
+};
+const navIcon = (k) => (NAV.find(n => n[0] === k) || [, , OVI.dot])[2];
+const relTime = (r) => {
+  const t = stamp(r); if (!t) return '—';
+  const m = Math.round((Date.now() - t) / 60000);
+  if (m < 1) return 'همین الان';
+  if (m < 60) return fa(m) + ' دقیقه پیش';
+  if (m < 24 * 60) return fa(Math.round(m / 60)) + ' ساعت پیش';
+  if (m < 7 * 24 * 60) return fa(Math.round(m / 1440)) + ' روز پیش';
+  return new Date(t).toLocaleDateString('fa-IR', { month: 'short', day: 'numeric' });
+};
+const SEP = '<span class="sep" aria-hidden="true"></span>';
+const compact = (n) => Number(n || 0).toLocaleString('fa-IR', { notation: 'compact', maximumFractionDigits: 1 });
+const niceMax = (x) => { if (x <= 0) return 1; const p = Math.pow(10, Math.floor(Math.log10(x))), m = x / p; return ([1, 1.2, 1.5, 2, 2.5, 3, 4, 5, 6, 8, 10].find(v => m <= v)) * p; };
+function revenueChart(paid, days) {
+  const d0 = new Date(); d0.setHours(0, 0, 0, 0);
+  const bins = Array.from({ length: days }, (_, i) => { const d = new Date(d0); d.setDate(d.getDate() - (days - 1 - i)); return { d, sum: 0, n: 0 }; });
+  paid.forEach(p => { const t = stamp(p); if (!t) return; const day = new Date(t); day.setHours(0, 0, 0, 0);
+    const i = Math.round((day - bins[0].d) / 864e5); if (i >= 0 && i < days) { bins[i].sum += +p.amount || 0; bins[i].n++; } });
+  const total = bins.reduce((a, b) => a + b.sum, 0), max = niceMax(Math.max(...bins.map(b => b.sum)));
+  const grid = [[1, compact(max)], [.5, compact(max / 2)], [0, '۰']].map(([f, l]) => '<div class="gl' + (f === 0 ? ' base' : '') + '" style="top:' + ((1 - f) * 100) + '%"><span class="num">' + l + '</span></div>').join('');
+  const cols = bins.map((b, i) => {
+    const h = b.sum ? Math.max(3, b.sum / max * 100) : 0, dl = b.d.toLocaleDateString('fa-IR', { weekday: 'long', month: 'long', day: 'numeric' });
+    const label = (i === days - 1 ? 'امروز، ' : '') + dl + ': ' + (b.sum ? toman(b.sum) + '، ' + fa(b.n) + ' پرداخت' : 'بدون پرداخت');
+    const side = i < 2 ? ' s' : i > days - 3 ? ' e' : '';
+    return '<div class="col" tabindex="0" role="img" aria-label="' + esc(label) + '">' + (h ? '<i style="height:' + h + '%"></i>' : '')
+      + '<div class="tip' + side + '" style="bottom:calc(' + h + '% + 8px)"><b class="num">' + (b.sum ? toman(b.sum) : 'بدون پرداخت') + '</b><span>' + esc(dl) + '</span>' + (b.n ? '<span class="num">' + fa(b.n) + ' پرداخت</span>' : '') + '</div></div>';
+  }).join('');
+  const xl = bins.map((b, i) => '<span>' + (i === days - 1 ? 'امروز' : (days - 1 - i) % 3 === 0 ? b.d.toLocaleDateString('fa-IR', { day: 'numeric', month: 'short' }) : '') + '</span>').join('');
+  return { total, html: '<div class="chart">' + grid + (total ? '<div class="cols">' + cols + '</div>' : '<div class="chart-empty">در ' + fa(days) + ' روز اخیر پرداختی ثبت نشده است</div>') + '</div>' + (total ? '<div class="xl" aria-hidden="true">' + xl + '</div>' : '') };
+}
+function meters(rows) {
+  const total = rows.reduce((a, r) => a + r[1], 0);
+  return '<div class="meters">' + rows.map(([l, n, cx]) => '<div class="meter' + (cx ? ' cx' : '') + '"><span>' + l + '</span><b class="num">' + fa(n) + '</b>'
+    + '<div class="bar" role="img" aria-label="' + esc(l + ': ' + fa(n) + ' از ' + fa(total)) + '"><i style="width:' + (total ? n / total * 100 : 0) + '%"></i></div></div>').join('') + '</div>';
+}
+function actIcon(type) {
+  const t = String(type || '');
+  if (t.startsWith('auth')) return [navIcon('customers'), 'mute'];
+  if (t.startsWith('order')) return [navIcon('orders'), ''];
+  if (t.startsWith('payment')) return [navIcon('payments'), t === 'payment.success' ? 'ok' : t === 'payment.start' ? 'mute' : 'warn'];
+  if (t.startsWith('service')) return [navIcon('requests'), 'acc'];
+  if (t.startsWith('cart') || t.startsWith('wishlist')) return [OVI.cart, 'mute'];
+  if (t.startsWith('catalog')) return [OVI.search, 'mute'];
+  if (t === 'admin') return [OVI.shield, ''];
+  return [OVI.dot, 'mute'];
+}
 V.overview = () => {
   const paid = DB.payments.filter(p => p.status === 'paid'), revenue = paid.reduce((a, p) => a + (+p.amount || 0), 0);
-  const today = new Date().toDateString(), todayAct = DB.activity.filter(a => new Date(a.at || a.createdAt).toDateString() === today).length;
-  const low = lowStock();
-  const k = (l, v, s, cls) => '<div class="card kpi' + (cls ? ' ' + cls : '') + '"><div class="l">' + l + '</div><div class="v num">' + v + '</div><div class="s">' + s + '</div></div>';
-  const recentO = newest(DB.orders).slice(0, 6).map(o => ({ id: o.id, cells: ['<span class="ltr num">' + esc(o.id) + '</span>', esc(custName(o)), '<span class="num">' + toman(o.total) + '</span>', stageBadge('order', o)] }));
-  const recentR = newest(DB.serviceRequests).slice(0, 6).map(r => ({ id: r.id, cells: ['<span class="ltr num">' + esc(r.id) + '</span>', esc(KIND[r.kind] || r.kind), esc(custName(r)), stageBadge(r.kind, r)] }));
-  return shell('نمای کلی', '', '<div class="grid kpis">'
-      + k('درآمد پرداخت‌شده', fa(revenue), 'تومان · ' + fa(paid.length) + ' پرداخت')
-      + k('سفارش‌ها', fa(DB.orders.length), fa(DB.orders.filter(isOpen).length) + ' در جریان')
-      + k('درخواست‌های خدمت', fa(DB.serviceRequests.length), fa(DB.serviceRequests.filter(isOpen).length) + ' باز')
-      + k('مشتریان', fa(DB.users.length), fa(DB.sessions.filter(s => s.type === 'login' || s.type === 'signup').length) + ' ورود ثبت‌شده')
-      + k('کم‌موجودی', fa(low.length), low.length ? low.map(p => esc(p.title)).slice(0, 2).join('، ') : 'همه محصولات موجودند', low.length ? 'alert' : '')
-      + k('فعالیت امروز', fa(todayAct), 'رویداد ثبت‌شده')
-    + '</div><div class="grid two" style="margin-top:14px">'
-    + '<section class="card pad"><div class="sec-h"><h2>آخرین سفارش‌ها</h2><a href="#orders">همه</a></div>' + table(['شماره', 'مشتری', 'مبلغ', 'وضعیت'], recentO, 'order') + '</section>'
-    + '<section class="card pad"><div class="sec-h"><h2>آخرین درخواست‌ها</h2><a href="#requests">همه</a></div>' + table(['کد', 'نوع', 'مشتری', 'وضعیت'], recentR, 'request') + '</section>'
-    + '</div><section class="card pad" style="margin-top:14px"><div class="sec-h"><h2>آخرین فعالیت‌ها</h2><a href="#activity">گزارش کامل</a></div>' + feed(newest(DB.activity).slice(0, 8)) + '</section>');
+  const openO = DB.orders.filter(isOpen), openR = DB.serviceRequests.filter(isOpen);
+  const active = DB.products.filter(p => p.active !== false), out = active.filter(p => (+p.stock || 0) <= 0), low = lowStock();
+  const weekAgo = Date.now() - 7 * 864e5, newUsers = DB.users.filter(u => stamp(u) >= weekAgo).length;
+  const I = (d, cls, sm) => '<span class="ic' + (cls ? ' ' + cls : '') + (sm ? ' sm' : '') + '">' + icon(d) + '</span>';
+
+  // 1) needs attention — each item opens the filtered list
+  const att = [];
+  if (openO.length) att.push('<a href="#orders" data-a="go" data-view="orders" data-f="open">' + I(navIcon('orders'), 'warn', 1) + '<span><b class="num">' + fa(openO.length) + '</b> سفارش در جریان</span><span class="go" aria-hidden="true">‹</span></a>');
+  if (openR.length) att.push('<a href="#requests" data-a="go" data-view="requests" data-f="open">' + I(navIcon('requests'), 'warn', 1) + '<span><b class="num">' + fa(openR.length) + '</b> درخواست خدمت باز</span><span class="go" aria-hidden="true">‹</span></a>');
+  if (low.length) att.push('<a href="#products" data-a="go" data-view="products">' + I(OVI.alert, out.length ? 'err' : 'warn', 1) + '<span><b class="num">' + fa(low.length) + '</b> محصول ' + (out.length ? 'ناموجود یا کم‌موجود' : 'کم‌موجود') + '</span><span class="go" aria-hidden="true">‹</span></a>');
+  const attention = '<section class="attn" aria-label="نیاز به رسیدگی">' + (att.length ? att.join('')
+    : '<div>' + I(OVI.check, 'ok', 1) + '<span>همه‌چیز مرتب است — سفارش یا درخواست بازی نیست و موجودی محصولات کافی است.</span></div>') + '</section>';
+
+  // 2) headline numbers
+  const stat = (href, d, cls, l, v, sub) => '<a class="card stat" href="' + href + '">' + I(d, cls) + '<div><div class="l">' + l + '</div><div class="v num">' + v + '</div><div class="s">' + sub + '</div></div></a>';
+  const stats = '<section class="stats" aria-label="آمار کلی">'
+    + stat('#payments', OVI.money, 'ok', 'درآمد پرداخت‌شده', revenue >= 1e6 ? compact(revenue) : fa(revenue), 'تومان' + SEP + fa(paid.length) + ' پرداخت')
+    + stat('#orders', navIcon('orders'), '', 'سفارش‌ها', fa(DB.orders.length), fa(openO.length) + ' در جریان')
+    + stat('#requests', navIcon('requests'), 'acc', 'درخواست‌های خدمت', fa(DB.serviceRequests.length), fa(openR.length) + ' باز')
+    + stat('#customers', navIcon('customers'), 'mute', 'مشتریان', fa(DB.users.length), fa(newUsers) + ' عضو جدید در ۷ روز')
+    + '</section>';
+
+  // 3) revenue trend + where orders/requests stand
+  const ch = revenueChart(paid, 14);
+  const oSt = (st) => DB.orders.filter(o => o.status !== 'cancelled' && (+o.stage || 1) === st).length;
+  const rSt = (f) => DB.serviceRequests.filter(r => r.status !== 'cancelled' && f(+r.stage || 1)).length;
+  const trend = '<section class="card pad trend"><div class="sec-h"><h2>درآمد ۱۴ روز اخیر</h2><span class="sum num">' + toman(ch.total) + '</span></div>' + ch.html + '</section>';
+  const status = '<section class="card pad"><div class="sec-h"><h2>وضعیت کارها</h2></div><div class="pipes">'
+    + '<div><h3>سفارش‌ها</h3>' + meters(STAGES.order.map((l, i) => [l, oSt(i + 1)]).concat([['لغو شده', DB.orders.filter(o => o.status === 'cancelled').length, 1]])) + '</div>'
+    + '<div><h3>درخواست‌های خدمت</h3>' + meters([['جدید', rSt(s => s === 1)], ['در حال انجام', rSt(s => s === 2 || s === 3)], ['تکمیل‌شده', rSt(s => s >= 4)],
+        ['لغو شده', DB.serviceRequests.filter(r => r.status === 'cancelled').length, 1]]) + '</div>'
+    + '</div></section>';
+
+  // 4) latest orders + requests in one list, and recent activity
+  const recs = newest(DB.orders.map(o => ({ k: 'order', r: o, at: o.at || o.createdAt, ts: o.ts })).concat(DB.serviceRequests.map(r => ({ k: 'request', r, at: r.at || r.createdAt, ts: r.ts })))).slice(0, 6);
+  const latest = '<section class="card pad"><div class="sec-h"><h2>آخرین سفارش‌ها و درخواست‌ها</h2><a href="#orders">همه</a></div>'
+    + (recs.length ? '<ul class="rlist">' + recs.map(({ k, r }) => {
+        const isO = k === 'order';
+        return '<li><button class="row" type="button" data-a="' + k + '" data-id="' + esc(r.id) + '">' + I(navIcon(isO ? 'orders' : 'requests'), isO ? '' : 'acc', 1)
+          + '<span class="t"><b>' + (isO ? 'سفارش ' : esc(KIND[r.kind] || 'درخواست') + ' ') + '<span class="ltr num">' + esc(r.id) + '</span>' + SEP + esc(custName(r)) + '</b><small>' + relTime(r) + '</small></span>'
+          + '<span class="e">' + (isO ? '<span class="num">' + toman(r.total) + '</span>' : '') + stageBadge(isO ? 'order' : r.kind, r) + '</span></button></li>';
+      }).join('') + '</ul>' : '<div class="empty">هنوز سفارش یا درخواستی ثبت نشده است</div>')
+    + '</section>';
+  const acts = newest(DB.activity).slice(0, 6);
+  const activity = '<section class="card pad"><div class="sec-h"><h2>آخرین فعالیت‌ها</h2><a href="#activity">گزارش کامل</a></div>'
+    + (acts.length ? '<ul class="rlist">' + acts.map(a => {
+        const d = a.data || {}, [ic, cls] = actIcon(a.type), who = a.userId === 'admin' ? 'مدیر' : (userOf(a.userId) || {}).name || 'مهمان';
+        const extra = d.what ? esc(d.what) : d.no ? '<span class="ltr">' + esc(d.no) + '</span>' : d.code ? '<span class="ltr">' + esc(d.code) + '</span>' : d.q ? '«' + esc(d.q) + '»' : '';
+        return '<li><div class="row">' + I(ic, cls, 1) + '<span class="t"><b>' + esc(ACT[a.type] || a.type) + (extra ? SEP + extra : '') + '</b><small>' + esc(who) + '</small></span><span class="e muted">' + relTime(a) + '</span></div></li>';
+      }).join('') + '</ul>' : '<div class="empty">هنوز فعالیتی ثبت نشده است</div>')
+    + '</section>';
+
+  return shell('نمای کلی', '', '<div class="ov">' + attention + stats + '<div class="ov-row">' + trend + status + '</div><div class="ov-row even">' + latest + activity + '</div></div>');
 };
 function feed(list) {
   if (!list.length) return '<div class="empty">هنوز فعالیتی ثبت نشده است</div>';
@@ -580,6 +736,7 @@ const ACTIONS = {
   'user-del': (el) => confirmBox('کاربر «' + esc((userOf(el.dataset.id) || {}).name || el.dataset.id) + '» حذف شود؟ اگر در اپ وارد شده باشد، از حسابش خارج می‌شود. سفارش‌ها و درخواست‌هایش برای سابقه باقی می‌مانند.', 'user-del-ok', el.dataset.id),
   'user-del-ok': async (el) => { if (await write('DELETE', 'users', el.dataset.id)) { logAdmin('حذف کاربر', { id: el.dataset.id }); closeOverlay(); toast('کاربر حذف شد'); render(); } },
   'side-toggle': () => toggleSide(),
+  go: (el) => { VIEW = el.dataset.view; UI = { q: '', f: el.dataset.f || 'all' }; if (location.hash.slice(1) === VIEW) render(); else location.hash = VIEW; },
   'side-close': () => toggleSide(false),
   'theme-toggle': () => toggleTheme(),
   export: () => exportDb(),
