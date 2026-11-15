@@ -1675,6 +1675,8 @@ class Component extends DCLogic {
         else this.go({ route: 'checkout' });
       },
       goAuth: () => this.goAuthFor('profile', 'profile'),
+      // service forms: 'sign in' link in the guest notice → login, then back to the same form (fields kept)
+      goAuthForm: () => { const r = this.state.route; this.goAuthFor(r, r); },
       toastAddr: () => this.toast('افزودن آدرس با MapPicker در نمونه بعدی'),
       toastPin: () => this.toast('انتخاب پین روی نقشه (Neshan) در نمونه بعدی'),
 

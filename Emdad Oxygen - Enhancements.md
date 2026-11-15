@@ -213,3 +213,7 @@ Changes from the handwritten review notes ("10.13 Nov milad-amin"):
   - **Deleted accounts.** If an admin deletes the account, the app signs the customer out.
   - **Grace period.** A record the app hasn't confirmed as saved is kept for up to 2 minutes, so it isn't mistaken for a deletion while it uploads.
   - **Privacy.** Customers see only their own data.
+
+## Update — sign-in link on the service forms
+
+- The guest notice on the gas-refill and equipment forms («برای ثبت درخواست، ابتدا با شماره موبایل وارد شوید…») now has a **ورود / ثبت‌نام** button. It opens the login page and, after the code is verified, returns to the same form with everything already typed still filled in; nothing is submitted until the user taps the form's own submit button.

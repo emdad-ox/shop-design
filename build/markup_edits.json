@@ -684,6 +684,12 @@
     "count": 2
   },
   {
+    "what": "SVC guest note: link to the login page",
+    "find": "برای ثبت درخواست، ابتدا با شماره موبایل وارد شوید — کد تأیید پیامک می‌شود.</div>",
+    "replace": "برای ثبت درخواست، ابتدا با شماره موبایل وارد شوید — کد تأیید پیامک می‌شود.\n          <button type=\"button\" onclick=\"{{ goAuthForm }}\" data-guest-login=\"\" style=\"display:flex;width:fit-content;align-items:center;gap:6px;margin-top:10px;height:36px;padding:0 14px;border:none;border-radius:999px;background:var(--p);color:#fff;font-family:inherit;font-weight:800;font-size:12.5px;cursor:pointer\">ورود / ثبت‌نام<svg width=\"14\" height=\"14\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2.4\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\"><path d=\"M15 18l-6-6 6-6\"></path></svg></button></div>",
+    "count": 2
+  },
+  {
     "what": "NOTES-13NOV #9 support button → opens contact sheet",
     "find": "<a href=\"tel:+989191002030\" aria-label=\"تماس با پشتیبانی امداد اکسیژن — شبانه‌روزی\" data-fab=\"\" style=\"{{ fabStyle }}\">\n    <svg width=\"18\" height=\"18\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><path d=\"M5 4h4l2 5-2.5 1.5a11 11 0 0 0 5 5L15 13l5 2v4a2 2 0 0 1-2 2A16 16 0 0 1 3 6a2 2 0 0 1 2-2\"></path></svg><span style=\"white-space:nowrap\">تماس با پشتیبانی امداد اکسیژن — شبانه‌روزی</span>\n  </a>",
     "replace": "<button type=\"button\" onclick=\"{{ openContact }}\" aria-haspopup=\"dialog\" aria-label=\"تماس با امداد اکسیژن — نشانی و تلفن\" data-fab=\"\" style=\"{{ fabStyle }}\">\n    <svg width=\"18\" height=\"18\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><path d=\"M5 4h4l2 5-2.5 1.5a11 11 0 0 0 5 5L15 13l5 2v4a2 2 0 0 1-2 2A16 16 0 0 1 3 6a2 2 0 0 1 2-2\"></path></svg><span style=\"white-space:nowrap\">تماس با پشتیبانی امداد اکسیژن — شبانه‌روزی</span>\n  </button>",
