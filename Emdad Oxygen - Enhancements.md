@@ -99,3 +99,117 @@ Build stays green (all exact-match markup edits resolve `x1`, except the two ser
 ### Bottom-sheet "disappears after open" fix
 Every bottom sheet (filter/sort, address picker, price-inquiry confirm) would slide up and then vanish a moment later. Cause: `manageSheetDrag` did `gsap.set(panel, { y: 0, clearProps: 'transform' })` before creating the drag handler — clearing the transform made `Draggable.create()` snapshot the `sheetIn` entrance animation's **start** value (translateY 100%) and pin the panel there via inline `translate3d(0, <panelHeight>, 0)`; once the CSS animation finished the panel reverted to that off-screen offset. Fixed by keeping the inline `y:0` (removed `clearProps`), so Draggable reads 0 and the sheet rests correctly. Verified: the panel's resting inline transform is now `translate3d(0px, 0px, 0px)` instead of `translate3d(0px, 395px, 0px)`.
 - Also (same review): sort/in-stock picks **inside** the open filter sheet now use a plain `setState` instead of a View-Transitions list-flip (the flip painted the product cards over the open sheet); page chips keep their animation. The filter button also got an `aria-label`.
+
+## Update — prototype UI/UX pass (Nov 2026, branch `prototype`)
+A Head-of-Design review with three associate designers (visual system / flows / accessibility+RTL). Full write-up: `docs/reviews/2026-11_prototype-design-review.md`.
+- **Truly offline now:** React 18.3.1 is inlined by `build.py`. Before this, the app fetched React from unpkg.com and stayed blank without a network.
+- **Design-refactor CSS layer actually applies:** its hooks never matched React's `prop: value` inline styles. The 12px floor, weight ramp and entrance stagger now take effect.
+- **AA contrast in both themes:** deeper dark CTA and hero gradients, AA light status tokens, new `--p-ink` and `--focus` tokens.
+- **Flows:**
+  - No empty or 0-toman orders, and Back no longer reopens an empty checkout.
+  - The toast never covers a CTA, and the support pill no longer aborts view transitions.
+  - Past delivery slots are disabled, and checkout preselects the first open slot.
+  - OTP submits automatically, a guest price inquiry asks for a verified phone, and out-of-stock shows "notify me".
+- **a11y:**
+  - The theme switches have names and states, inputs have labels and autocomplete, and toasts use a persistent live region.
+  - Carousel dots work from the keyboard, and the carousel can be paused.
+  - Focus never hides under sticky chrome.
+
+## Update — Apple system design + glassmorphism (branch `prototype`)
+The UI now follows the iOS Human Interface Guidelines, with Liquid-Glass-style materials:
+- **Colors.** iOS system neutrals: `systemGroupedBackground`, `label`, `secondaryLabel` and `separator`, plus Apple's accessible green, red and orange. The Emdad purple remains the app **tint** and teal-cyan remains the accent.
+- **Glass materials.** New `--glass-thin / --glass / --glass-thick / --glass-chrome` tokens. Each is a translucent fill with backdrop blur and saturation, a 0.5px light edge and a specular top highlight. Cards, product cards, sheets, toasts and bars all use them.
+- **Navigation bar.** A glass bar with a **large title** (28pt) on tab screens. On scroll it collapses to a centered 17pt inline title without shifting the layout. Bar buttons are small glass circles in the tint color.
+- **Tab bar.** A **floating glass capsule** (iOS 26 style). The selected tab sits under a glass lens that moves between tabs with a spring.
+- **Controls.**
+  - Buttons: filled capsule buttons with a light top edge; buttons dim when pressed.
+  - Fields: text and search fields use the iOS gray fill.
+  - Switch: the iOS switch (51×31, green when on).
+  - Sheets: a glass sheet with a grabber.
+  - Toast: a glass capsule.
+  - Lists: grouped lists with inset separators.
+  - Floating action buttons: placed in a 12px gap above the tab bar.
+- **Appearance.** The theme follows the system light/dark setting live until the user chooses one, as Apple apps do.
+- **Accessibility.** With Reduce Transparency on, or in browsers without `backdrop-filter`, the glass materials become solid surfaces.
+- **Persian note.** Apple's negative tracking on titles is deliberately not applied, because letter-spacing breaks the joined letters of Arabic script. Vazirmatn stays the bundled font so the file still works offline.
+
+## Update — review notes of 13 Nov (branch `prototype`)
+Changes from the handwritten review notes ("10.13 Nov milad-amin"):
+1. **Apple system design:** already in place from the earlier glass pass.
+2. **Wording:** "second-hand" (دست دوم) becomes "equipment" (تجهیزات) everywhere: «فروش تجهیزات».
+3. **Home:** the shop (featured products) moves to the end of the page, after «چرا امداد اکسیژن؟».
+4. **Category:** «کپسول گاز» is renamed «کپسول طبی».
+5. **Theme:** light is the fixed default; dark appears only when the user switches to it.
+6. **Refill form:** the gas-type field is removed.
+7. **Photos:** optional on the refill and equipment-sale forms.
+8. **Refill delivery time:** chosen in a pop-up from an optional "Delivery time" row; the row shows the chosen time.
+9. **Contact pop-up:** the support button opens a pop-up instead of dialing directly.
+10. **Pop-up content:** a directions button, the address between, then a call button, with the number shown underneath. The contact details are in the `CONTACT` constant in `script_2.work.js`. **The street address is a placeholder** until the official address from the Emdad Oxygen website is supplied.
+11. **Delivery time optional:** in checkout and in refill. With no time chosen, the record says «هماهنگی تلفنی»; tapping the chosen slot again clears it.
+12. **Phone fields:** removed from refill, equipment sale and checkout. Submitting requires login, and the verified login number is used.
+13. **Login:** also asks for first and last name; both are required and saved as the profile name.
+
+## Update — Vazir typeface (branch `prototype`)
+- The app font is now **Vazir** v30.1.0, by Saber Rastikerdar, under the SIL Open Font License; see `build/font_bundle/OFL.txt`.
+- **Bundled offline.** `build/build.py` builds the `@font-face` rules from `build/font_bundle/*.woff2` (Regular 400, Medium 500, Bold 700; about 130 KB) and adds them in front of the app CSS at build time. No network access is needed.
+- Weight 600 renders with the Bold file.
+- Vazirmatn stays only as the fallback in the font stacks.
+
+## Update — JSON database (branch `prototype`)
+- **`db.json`** (project root) is the app's database. **`server.js`** (`npm start`, no dependencies) serves the app and a REST API that writes to it.
+- **App sync layer** (`dbInit` / `dbSync` / `dbAuth` in `script_2.work.js`). After every change, the app compares the state with its previous snapshot and writes what changed:
+  - **Auth:** signup, login and logout records, and the user with first and last name.
+  - **Shopping:** carts, wishlists and address books, for the guest and then the logged-in user.
+  - **Submissions:** orders, service requests and price inquiries.
+  - **Profile and catalog:** profile renames, theme changes, catalog searches and filters.
+  - **Activity:** an event log of all of the above.
+- **Same data in the browser.** Every write is also saved in the browser (`emdad:db`), so the app behaves the same without a server. On GitHub Pages it doesn't look for the server at all.
+
+## Update — price inquiries removed, payment after checkout (branch `prototype`)
+- **Price inquiries removed, together with everything connected to them:**
+  - the «استعلام قیمت» pills, buttons and confirmation pop-up
+  - the «استعلام‌های قیمت» Profile menu row and page
+  - the inquiry success screen
+  - the inquiry state, flow and login hand-off
+  - the `priceInquiries` collection in `db.json`
+- **Every product is priced and can be bought.** The concentrator and the CO₂ cylinder had no price, so they now have **demo prices** (32,500,000 and 1,850,000 Toman), marked `TODO(content)` in `PRODUCTS`.
+- **Out of stock:** the button opens the contact pop-up. The earlier version of this button couldn't be tapped because its floating bar blocked clicks; that's fixed.
+- **Payment.** Checkout's button reads «ادامه و پرداخت» and opens a **payment page**:
+  - the amount, card number, CVV2, expiry and a one-time code (shown in a message in this demo)
+  - it's a **test gateway**: no money moves, and test card `6037 9975 9999 9993` is shown on the page
+  - the order is created **only after a successful payment**; cancelling returns to checkout with no order
+  - the order page shows "online payment successful · tracking code", and the invoice banner switches to «فاکتور پرداخت‌شده»
+- **Card data:** only the **masked** card number (`6037 99** **** 9993`) and the tracking code are saved, in the order and in `db.json` → `payments`. The full number, CVV2 and one-time code are never stored and are wiped after paying or cancelling.
+- **Activity log:** new event types `payment.start`, `payment.error`, `payment.cancel` and `payment.success`.
+
+## Update — admin dashboard (branch `prototype`)
+- **`admin.html`**, a full administration panel built from `build/admin.src.html`. Sections:
+  - **overview** (KPIs, recent orders and requests, live activity)
+  - **orders** (search, filter, detail, stage and cancel)
+  - **service requests**
+  - **payments**
+  - **products** (add, edit, delete, show or hide, price, stock, specs, image)
+  - **services** (edit the built-ins, add new ones)
+  - **customers** (with history)
+  - **activity log**
+  - **data** (download `db.json`, clear test data)
+- **The app follows the dashboard.**
+  - Products and services now load from the database; admin-added products get a category image.
+  - Order and request stages come from the admin, including a new **«لغو شد»** (cancelled) state. Stages no longer advance by themselves over time.
+  - Services page cards are bound to the services database, and admin-added services are listed and open the contact pop-up.
+  - The app refreshes on focus, on changes from another tab, and every 15 seconds.
+- **`db.json` and `server.js`:** new `products` and `services` collections, seeded with the current catalogue (8 products, 2 services).
+- **Demo admin password:** `emdad-admin`. It's a client-side gate, not real security.
+
+## Update — full edit and delete in the dashboard, shared records in the app (branch `prototype`)
+- **Dashboard:**
+  - products and services: add, edit and delete (built-in services can be renamed or hidden)
+  - **users:** list, edit the name, delete
+  - **orders:** edit address, delivery time and note; delete (the payment record is kept for accounting)
+  - **service requests:** edit details, delete
+  - changing section (for example with the browser's Back button) now closes any open drawer
+- **App:**
+  - **Records from the database.** For a signed-in customer, the profile name, orders and service requests now load from the database, so admin edits and deletions show immediately. With the server, the same account sees its records on a second device.
+  - **Deleted accounts.** If an admin deletes the account, the app signs the customer out.
+  - **Grace period.** A record the app hasn't confirmed as saved is kept for up to 2 minutes, so it isn't mistaken for a deletion while it uploads.
+  - **Privacy.** Customers see only their own data.

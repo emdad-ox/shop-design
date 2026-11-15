@@ -3,7 +3,8 @@ class Component extends DCLogic {
   state = {
     route: 'home', theme: null, pid: null, qty: 1, cart: {}, wish: {},
     cat: 'all', q: '', inStock: false, sort: 'new', sheet: false,
-    inqSheet: false, inqPid: null,
+    contactOpen: false, rfTimeOpen: false,   // notes 13-Nov: contact sheet (#9/#10), refill delivery-time sheet (#8)
+    authFirst: '', authLast: '',             // notes 13-Nov #13: login collects first + last name
     disc: null, discInput: '', discErr: '',
     addrId: 1, phone: '', note: '',
     addresses: [
@@ -20,7 +21,9 @@ class Component extends DCLogic {
     resendIn: 0, authReturn: null, authFrom: 'profile', pendingSubmit: null,
     editingName: false, nameInput: '',
     // records
-    orders: [], requests: [], inquiries: [], busy: '',
+    orders: [], requests: [], busy: '',
+    // payment (online, simulated gateway) — transient: never persisted; cleared after pay/cancel
+    payCard: '', payCvv: '', payMonth: '', payYear: '', payPin: '', payPinSent: '', payErr: '',
     // delivery scheduling (P7)
     coDay: 0, coSlot: '',
     // refill form
@@ -42,8 +45,8 @@ class Component extends DCLogic {
     { id:'oxy5', title:'کپسول اکسیژن ۵ لیتری پرتابل', cat:'cyl', gas:'اکسیژن طبی', price:2150000, vis:true, stock:4, new:true,
       desc:'کپسول پرتابل ۵ لیتری همراه کیف حمل؛ مناسب جابه‌جایی بیمار و سفر. قابلیت شارژ سریع در محل مجموعه.',
       specs:[['حجم','۵ لیتر'],['فشار کاری','۱۵۰ بار'],['وزن تقریبی','۷ کیلوگرم'],['کیف حمل','دارد']] },
-    { id:'conc', title:'دستگاه اکسیژن‌ساز ۵ لیتری', cat:'dev', gas:'اکسیژن‌ساز خانگی', price:0, vis:false, stock:3,
-      desc:'اکسیژن‌ساز خانگی با خروجی ۵ لیتر در دقیقه و غلظت اکسیژن تا ۹۳٪؛ دارای نبولایزر داخلی و هشدار افت غلظت. قیمت با استعلام اعلام می‌شود.',
+    { id:'conc', title:'دستگاه اکسیژن‌ساز ۵ لیتری', cat:'dev', gas:'اکسیژن‌ساز خانگی', price:32500000, vis:true, stock:3,   // TODO(content): demo price — confirm the real price
+      desc:'اکسیژن‌ساز خانگی با خروجی ۵ لیتر در دقیقه و غلظت اکسیژن تا ۹۳٪؛ دارای نبولایزر داخلی و هشدار افت غلظت.',
       specs:[['خروجی','۵ لیتر بر دقیقه'],['غلظت اکسیژن','تا ۹۳٪'],['سطح صدا','≤ ۴۵ دسی‌بل'],['گارانتی','۱۸ ماه']] },
     { id:'mano', title:'مانومتر اکسیژن طبی', cat:'acc', gas:'اکسیژن طبی', price:850000, vis:true, stock:25,
       desc:'مانومتر دو گیج با فلومتر و مرطوب‌کننده؛ سازگار با کپسول‌های استاندارد اکسیژن طبی.',
@@ -51,8 +54,8 @@ class Component extends DCLogic {
     { id:'mask', title:'ماسک اکسیژن بزرگسال', cat:'acc', gas:'مصرفی تنفسی', price:95000, vis:true, stock:60,
       desc:'ماسک اکسیژن بزرگسال با کش تنظیم و لوله ۲ متری؛ یک‌بارمصرف بهداشتی.',
       specs:[['سایز','بزرگسال'],['طول لوله','۲ متر'],['نوع','یک‌بارمصرف']] },
-    { id:'co2', title:'کپسول CO₂ صنعتی ۲۰ لیتری', cat:'cyl', gas:'دی‌اکسید کربن', price:0, vis:false, stock:8,
-      desc:'کپسول دی‌اکسید کربن صنعتی ۲۰ لیتری مناسب صنایع غذایی و جوشکاری؛ قیمت روز با استعلام اعلام می‌شود.',
+    { id:'co2', title:'کپسول CO₂ صنعتی ۲۰ لیتری', cat:'cyl', gas:'دی‌اکسید کربن', price:1850000, vis:true, stock:8,   // TODO(content): demo price — confirm the real price
+      desc:'کپسول دی‌اکسید کربن صنعتی ۲۰ لیتری مناسب صنایع غذایی و جوشکاری.',
       specs:[['حجم','۲۰ لیتر'],['کاربرد','صنعتی / غذایی'],['وضعیت تحویل','پر و پلمب']] },
     { id:'nebu', title:'نبولایزر قابل حمل', cat:'dev', gas:'تجهیزات تنفسی', price:1780000, vis:true, stock:0, new:true,
       desc:'نبولایزر کمپرسوری قابل حمل با ماسک بزرگسال و کودک؛ مناسب داروهای استنشاقی.',
@@ -61,7 +64,7 @@ class Component extends DCLogic {
 
   CATS = [
     { id:'all', label:'همه' },
-    { id:'cyl', label:'کپسول گاز' },
+    { id:'cyl', label:'کپسول طبی' },
     { id:'dev', label:'دستگاه‌ها' },
     { id:'acc', label:'لوازم جانبی' }
   ];
@@ -71,7 +74,7 @@ class Component extends DCLogic {
 
   STORE_KEY = 'emdad:v1';
   SCHEMA_V = 2;
-  DURABLE = ['cart','wish','addresses','nextAddrId','orders','requests','inquiries','loggedIn','userName','phone','addrId','theme'];
+  DURABLE = ['cart','wish','addresses','nextAddrId','orders','requests','loggedIn','userName','phone','addrId','theme'];
   ART_OF = { oxy40:'cyl', oxy10:'cyl', oxy5:'cyl', co2:'cyl', conc:'dev', nebu:'dev', mano:'mano', mask:'mask' };
   PRODUCT_ART = {
     cyl: '<svg viewBox="0 0 96 96" width="56%" height="56%" fill="none" stroke="currentColor" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"><rect x="32" y="26" width="32" height="58" rx="16" fill="currentColor" fill-opacity=".1"/><path d="M43 26v-5a5 5 0 0 1 10 0v5"/><rect x="41" y="12" width="14" height="8" rx="2" fill="currentColor" fill-opacity=".1"/><path d="M32 44h32M32 68h32"/></svg>',
@@ -87,12 +90,13 @@ class Component extends DCLogic {
     document.documentElement.dir = 'rtl';
     const hyd = this.hydrate();
     this.applyTheme();
+    this.dbInit();
     if (!(hyd && hyd.loggedIn) && (this.props.startLoggedIn ?? true) && !this.state.loggedIn) {
       this.setState({ loggedIn: true, userName: 'کاربر امداد اکسیژن', phone: '0912 845 7455' });
     }
     this._onKey = (e) => this.handleKey(e); document.addEventListener('keydown', this._onKey);
     // App-bar scroll elevation (P4): hairline appears once content scrolls under the sticky bar.
-    this._onScroll = () => { const v = window.scrollY > 4; if (this._scrolled !== v) { this._scrolled = v; document.body.dataset.scrolled = v ? '1' : ''; } };
+    this._onScroll = () => { const v = window.scrollY > 4; if (this._scrolled !== v) { this._scrolled = v; if (v) document.body.dataset.scrolled = '1'; else delete document.body.dataset.scrolled; } };
     window.addEventListener('scroll', this._onScroll, { passive: true });
     this._onScroll();
     // History routing (P3): seed the current route so the first Back doesn't pop an empty stack,
@@ -100,10 +104,14 @@ class Component extends DCLogic {
     try { history.replaceState({ eoRoute: this.state.route, pid: this.state.pid }, ''); } catch (e) {}
     this._lastRoute = this.state.route; this._lastOverlay = false;
     this._onPop = (e) => {
-      if (this.state.sheet || this.state.addrSheet || this.state.inqSheet) { this._navSource = 'pop'; this.closeOverlays(); return; }
+      if (this.state.sheet || this.state.addrSheet || this.state.contactOpen || this.state.rfTimeOpen) { this._navSource = 'pop'; this.closeOverlays(); return; }
       const st = e.state || {};
       this._navSource = 'pop';
-      this.go({ route: st.eoRoute || 'home', pid: st.pid });
+      let to = st.eoRoute || 'home';
+      if ((to === 'checkout' || to === 'payment') && !this.cartTotals().count) to = 'cart';
+      if (this.state.route === 'payment' && to !== 'payment') this.setState(this.PAY_RESET);
+      if (to === 'auth' && this.state.loggedIn) to = this.state.authFrom || 'profile';
+      this.go({ route: to, pid: st.pid });
     };
     window.addEventListener('popstate', this._onPop);
     this.loadGsap();
@@ -155,6 +163,9 @@ class Component extends DCLogic {
     // Track route/overlay transitions via our OWN previous values — dc-runtime does not pass a
     // reliable prevState to componentDidUpdate, so we can't depend on the framework's prevState.
     const routeChanged = this._lastRoute !== undefined && this._lastRoute !== this.state.route;
+    if (routeChanged && this.state.toastShow && performance.now() - (this._toastAt || 0) > 400) {
+      clearTimeout(this._toastT); this.setState({ toastShow: false });
+    }
     if (routeChanged) {
       // History routing (P3): every route change (including morphTo/openMorph, which bypass go())
       // funnels through here — the universal choke point. Push a state-ONLY entry (no URL: a
@@ -169,7 +180,7 @@ class Component extends DCLogic {
     }
     // Opening a bottom-sheet pushes a disposable history entry so hardware Back closes the sheet
     // instead of leaving the route (P3 overlay layer).
-    const ovNow = !!(this.state.sheet || this.state.addrSheet || this.state.inqSheet);
+    const ovNow = !!(this.state.sheet || this.state.addrSheet || this.state.contactOpen || this.state.rfTimeOpen);
     if (ovNow && !this._lastOverlay && this._navSource !== 'pop') { try { history.pushState({ eoRoute: this.state.route, pid: this.state.pid, overlay: true }, ''); } catch (e) {} }
     this._lastOverlay = ovNow;
     this._lastRoute = this.state.route;
@@ -185,8 +196,13 @@ class Component extends DCLogic {
     this.manageSuccessFx();
     this.manageAuthFx();
     if (this._hydrated) this.persist();
+    this.dbSync();
   }
   componentWillUnmount() {
+    if (window.emdadDB) delete window.emdadDB;
+    clearInterval(this._dbPollT);
+    if (this._onDbStorage) window.removeEventListener('storage', this._onDbStorage);
+    if (this._onDbFocus) document.removeEventListener('visibilitychange', this._onDbFocus);
     document.removeEventListener('keydown', this._onKey);
     if (this._onScroll) window.removeEventListener('scroll', this._onScroll);
     if (this._onPop) window.removeEventListener('popstate', this._onPop);
@@ -252,7 +268,8 @@ class Component extends DCLogic {
     const A = this.PRODUCT_ART;
     const inject = (el, id) => {
       if (!el) return;
-      const a = this.ART_OF[id] || 'cyl';
+      const pr = this.PRODUCTS.find(x => x.id === id);
+      const a = this.ART_OF[id] || (pr && pr.art) || ({ cyl: 'cyl', dev: 'dev', acc: 'mano' }[pr && pr.cat]) || 'cyl';
       if (el.__art === a) return;
       el.innerHTML = A[a] || A.cyl; el.__art = a;
       el.style.display = 'grid'; el.style.placeItems = 'center'; el.style.color = 'var(--p)';
@@ -329,14 +346,14 @@ class Component extends DCLogic {
     const width = () => viewport.getBoundingClientRect().width || 320;
     const dots = [...document.querySelectorAll('[data-hero-dots] [data-dot]')];
     const clamp = (i) => Math.max(0, Math.min(N - 1, i));
-    const setDots = (i) => dots.forEach((d, k) => { const a = k === clamp(i); d.style.width = a ? '16px' : '6px'; d.style.background = a ? 'var(--p)' : 'var(--line)'; });
+    const setDots = (i) => dots.forEach((d, k) => { const a = k === clamp(i); d.style.width = a ? '16px' : '6px'; d.style.background = a ? 'var(--p)' : 'var(--line)'; d.setAttribute('aria-current', a ? 'true' : 'false'); });
     const goTo = (i, animate) => {
       i = clamp(i); const x = -i * width();
       if (g && !self.reduceMotion() && animate !== false) g.to(track, { x: x, duration: 0.4, ease: 'power3.out', overwrite: 'auto' });
       else if (g) g.set(track, { x: x }); else track.style.transform = 'translateX(' + x + 'px)';
       setDots(i);
     };
-    dots.forEach((d, i) => { d.onclick = () => goTo(i, true); });
+    this.wireDots(dots, (i) => goTo(i, true));
     goTo(0, false);
     if (this._gsapReady && window.Draggable) {
       this._heroDrag = window.Draggable.create(track, {
@@ -349,6 +366,24 @@ class Component extends DCLogic {
         onThrowComplete() { setDots(Math.round(-this.x / width())); },
       })[0];
     }
+  }
+
+  // After a failed submit, scroll the first visible error message into view (it is often above the fold).
+  revealFirstError() {
+    requestAnimationFrame(() => {
+      const el = [...document.querySelectorAll('[style*="--err)"]')].find(n => n.textContent.trim() && n.offsetParent);
+      if (el) el.scrollIntoView({ block: 'center', behavior: this.reduceMotion() ? 'auto' : 'smooth' });
+    });
+  }
+
+  // a11y: the 6px dot <span>s are the only non-swipe way through a carousel — make them buttons.
+  wireDots(dots, onPick) {
+    dots.forEach((d, i) => {
+      d.setAttribute('role', 'button'); d.tabIndex = 0;
+      d.setAttribute('aria-label', 'اسلاید ' + this.fmt(i + 1));
+      d.onclick = () => onPick(i);
+      d.onkeydown = (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onPick(i); } };
+    });
   }
 
   // Home hero slideshow: a 2-slide auto-playing carousel (brand banner + promo image → services)
@@ -371,7 +406,7 @@ class Component extends DCLogic {
     const dots = [...document.querySelectorAll('[data-home-hero-dots] [data-dot]')];
     const wrap = (i) => ((i % N) + N) % N;
     let cur = 0;
-    const setDots = (i) => dots.forEach((d, k) => { const a = k === i; d.style.width = a ? '16px' : '6px'; d.style.background = a ? 'var(--p)' : 'var(--line)'; });
+    const setDots = (i) => dots.forEach((d, k) => { const a = k === i; d.style.width = a ? '16px' : '6px'; d.style.background = a ? 'var(--p)' : 'var(--line)'; d.setAttribute('aria-current', a ? 'true' : 'false'); });
     const goTo = (i, animate) => {
       cur = wrap(i); const x = -cur * width();
       if (g && !self.reduceMotion() && animate !== false) g.to(track, { x: x, duration: 0.45, ease: 'power3.out', overwrite: 'auto' });
@@ -380,9 +415,14 @@ class Component extends DCLogic {
     };
     const stopAuto = () => { if (self._homeHeroTimer) { clearInterval(self._homeHeroTimer); self._homeHeroTimer = null; } };
     const startAuto = () => { stopAuto(); if (self.reduceMotion() || N < 2) return; self._homeHeroTimer = setInterval(() => goTo(cur + 1, true), 5000); };
-    dots.forEach((d, i) => { d.onclick = () => { goTo(i, true); startAuto(); }; });
+    this.wireDots(dots, (i) => { goTo(i, true); startAuto(); });
     goTo(0, false);
     startAuto();
+    // WCAG 2.2.2: auto-advance pauses while the carousel is hovered or holds keyboard focus
+    viewport.addEventListener('pointerenter', stopAuto);
+    viewport.addEventListener('pointerleave', startAuto);
+    track.addEventListener('focusin', stopAuto);
+    track.addEventListener('focusout', startAuto);
     if (this._gsapReady && window.Draggable) {
       this._homeHeroDrag = window.Draggable.create(track, {
         type: 'x', inertia: !!window.InertiaPlugin, dragClickables: true, cursor: 'grab', activeCursor: 'grabbing',
@@ -516,7 +556,10 @@ class Component extends DCLogic {
     });
   }
 
-  theme() { return this.state.theme ?? (this.props.defaultTheme ?? 'light'); }
+  theme() {
+    // notes 13-Nov #5: LIGHT is the fixed default; dark only when the user explicitly switches
+    return this.state.theme || 'light';
+  }
   applyTheme() {
     document.body.dataset.theme = this.theme();
     // Only override the per-theme CSS --acc token when a custom accent prop is supplied,
@@ -534,14 +577,13 @@ class Component extends DCLogic {
     order:   ['ثبت سفارش', 'در حال آماده‌سازی', 'ارسال شد', 'تحویل شد'],
     refill:  ['ثبت درخواست', 'جمع‌آوری کپسول', 'در حال شارژ', 'تحویل شد'],
     used:    ['ثبت درخواست', 'در حال بررسی', 'قیمت‌گذاری', 'تکمیل شد'],
-    inquiry: ['ثبت استعلام', 'در حال بررسی', 'قیمت‌گذاری', 'اعلام قیمت'],
   };
-  // Demo-paced fulfilment: a fresh record sits at stage 1, then advances over real elapsed
-  // time (persisted ts keeps progressing across reloads). Clamped to the final stage.
-  stageOf(ts) { if (!ts) return 1; const m = (Date.now() - ts) / 60000; return m >= 8 ? 4 : m >= 3 ? 3 : m >= 0.75 ? 2 : 1; }
-  stepperVM(kind, ts) {
+  // Fulfilment stage is set by the admin dashboard (record.stage 1..4, record.status 'cancelled');
+  // a new record sits at stage 1 until an admin moves it. (Was: demo time-based auto-advance.)
+  stageOf(rec) { const n = rec && +rec.stage; return n >= 1 && n <= 4 ? n : 1; }
+  stepperVM(kind, rec) {
     const names = this.STAGES[kind] || this.STAGES.order;
-    const st = this.stageOf(ts), final = st >= 4;
+    const st = this.stageOf(rec), final = st >= 4, cancelled = !!(rec && rec.status === 'cancelled');
     const dot = (n) => {
       const reached = st >= n, active = st === n;
       return 'width:12px;height:12px;border-radius:999px;flex:none;background:' + (reached ? 'var(--p)' : 'var(--sur2)')
@@ -549,10 +591,10 @@ class Component extends DCLogic {
     };
     const seg = (n) => 'flex:1;height:2px;border-radius:2px;background:' + (st > n ? 'var(--p)' : 'var(--line)');
     return {
-      stageLabel: names[st - 1], stepLabel: 'مرحله ' + this.fmt(st) + ' از ۴',
-      chipText: names[st - 1],
+      stageLabel: cancelled ? 'لغو شد' : names[st - 1], stepLabel: cancelled ? 'این مورد لغو شده است' : 'مرحله ' + this.fmt(st) + ' از ۴',
+      chipText: cancelled ? 'لغو شد' : names[st - 1],
       chipStyle: 'font-size:10.5px;font-weight:700;padding:4px 12px;border-radius:999px;color:'
-        + (final ? 'var(--ok)' : 'var(--p)') + ';background:' + (final ? 'var(--ok-soft)' : 'var(--p-soft)'),
+        + (cancelled ? 'var(--err)' : final ? 'var(--ok)' : 'var(--p)') + ';background:' + (cancelled ? 'var(--err-soft)' : final ? 'var(--ok-soft)' : 'var(--p-soft)'),
       dot1: dot(1), dot2: dot(2), dot3: dot(3), dot4: dot(4), seg1: seg(1), seg2: seg(2), seg3: seg(3),
     };
   }
@@ -562,8 +604,13 @@ class Component extends DCLogic {
   // exactly what was ordered/requested.
   orderVM(o) {
     if (!o) return {};
-    const st = this.stepperVM('order', o.ts);
+    const st = this.stepperVM('order', o);
     return {
+      odInvTitle: o.paid ? 'فاکتور پرداخت‌شده —' : 'پیش‌فاکتور —',
+      odInvNote: o.paid ? 'مبلغ به‌صورت آنلاین پرداخت شد (کارت \u2066' + o.payCard + '\u2069). زمان تحویل را همکاران ما هماهنگ می‌کنند.' : 'پرداخت آنلاین انجام نشده و مبلغ نهایی و زمان تحویل هنگام تماس همکاران ما تأیید می‌شود.',
+      odInvBg: o.paid ? 'var(--ok-soft)' : 'var(--warn-soft)',
+      odInvBorder: o.paid ? 'color-mix(in oklab, var(--ok) 30%, var(--line))' : 'color-mix(in oklab, var(--warn) 30%, var(--line))',
+      odPayLine: o.payRef ? 'پرداخت آنلاین موفق · کد پیگیری ' + this.fmtDigits(o.payRef) : 'پیامک تأیید برای شما ارسال شد',
       odNo: o.no, odDate: o.date, odDelivery: o.delivery || 'هماهنگی تلفنی',
       odItems: (o.items || []).map(it => ({ title: it.title, qtyFa: this.fmt(it.qty), lineLabel: this.fmt(it.line) })),
       odSubtotalLabel: this.fmt(o.subtotal != null ? o.subtotal : o.total),
@@ -576,9 +623,9 @@ class Component extends DCLogic {
   }
   requestVM(r) {
     if (!r) return {};
-    const st = this.stepperVM(r.kind, r.ts);
+    const st = this.stepperVM(r.kind, r);
     return {
-      rdKind: r.kind === 'refill' ? 'شارژ کپسول گاز' : 'فروش دست دوم',
+      rdKind: r.kind === 'refill' ? 'شارژ کپسول گاز' : 'فروش تجهیزات',
       rdCode: r.code, rdDate: r.date,
       rdDelivery: r.delivery || '', rdHasDelivery: !!(r.kind === 'refill' && r.delivery),
       rdGas: r.gas || '', rdHasGas: !!r.gas,
@@ -588,6 +635,242 @@ class Component extends DCLogic {
       rdChipStyle: st.chipStyle, rdChipText: st.chipText, rdStageLabel: st.stageLabel, rdStepLabel: st.stepLabel,
     };
   }
+
+  // ======================================================================================
+  // JSON DB (db.json) — every login / signup / logout, cart, wishlist, address, order,
+  // service request, payment, profile edit and catalog search is written to db.json
+  // through server.js (`npm start`). Writes are also mirrored in the browser (localStorage
+  // `emdad:db`, same schema) so the app behaves identically when no server is reachable
+  // (GitHub Pages, file://). Inspect from the console: window.emdadDB.dump() / .online().
+  // ======================================================================================
+  DB_API = '/api';
+  DB_LOCAL = 'emdad:db';
+  DB_COLS = ['users','sessions','carts','wishlists','addressBooks','orders','payments','serviceRequests','products','services','activity'];
+  deviceId() {
+    if (this._devId) return this._devId;
+    let id = null;
+    try { id = localStorage.getItem('emdad:device'); } catch (e) {}
+    if (!id) { id = 'd_' + Math.random().toString(36).slice(2, 10) + Date.now().toString(36); try { localStorage.setItem('emdad:device', id); } catch (e) {} }
+    return (this._devId = id);
+  }
+  userIdOf(phone) { const d = this.deFa(phone || '').replace(/\D/g, '').slice(-10); return d.length === 10 ? 'u_0' + d : null; }
+  dbOwner() { return (this.state.loggedIn && this.userIdOf(this.state.phone)) || ('guest_' + this.deviceId()); }
+  dbMirror() {
+    let db = null;
+    try { db = JSON.parse(localStorage.getItem(this.DB_LOCAL)); } catch (e) {}
+    if (!db || typeof db !== 'object') db = { meta: { app: 'emdad-oxygen-shop', schema: 1 } };
+    this.DB_COLS.forEach(c => { if (!Array.isArray(db[c])) db[c] = []; });
+    return db;
+  }
+  // apply one write to the browser mirror (same semantics as server.js)
+  dbApplyLocal(method, col, id, body) {
+    const db = this.dbMirror(), list = db[col], now = new Date().toISOString();
+    const idx = id == null ? -1 : list.findIndex(r => String(r.id) === String(id));
+    if (method === 'POST') list.push({ id: body.id || ('r_' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6)), createdAt: now, ...body });
+    else if (method === 'DELETE') { if (idx >= 0) list.splice(idx, 1); }
+    else {
+      const base = idx < 0 ? { id, createdAt: now } : (method === 'PATCH' ? list[idx] : { id, createdAt: list[idx].createdAt });
+      const rec = { ...base, ...body, id, updatedAt: now };
+      if (idx < 0) list.push(rec); else list[idx] = rec;
+    }
+    if (db.activity.length > 400) db.activity.splice(0, db.activity.length - 400);   // keep the mirror small
+    db.meta.updatedAt = now;
+    try { localStorage.setItem(this.DB_LOCAL, JSON.stringify(db)); } catch (e) {}
+  }
+  // one write → browser mirror (always) + server (when reachable). Resolves to the server's JSON or null.
+  dbWrite(method, col, id, body) {
+    this.dbApplyLocal(method, col, id, body || {});
+    const send = () => {
+      if (!this._dbOnline) return Promise.resolve(null);
+      const url = this.DB_API + '/' + col + (id != null ? '/' + encodeURIComponent(id) : '');
+      return fetch(url, { method, headers: { 'Content-Type': 'application/json' }, body: method === 'DELETE' ? undefined : JSON.stringify(body || {}) })
+        .then(r => (r.ok ? r.json() : null)).catch(() => null);
+    };
+    // writes made before the health probe answers wait for it (keeps signup/login ordering intact)
+    return (this._dbProbe || Promise.resolve()).then(send);
+  }
+  dbLog(type, data) {
+    return this.dbWrite('POST', 'activity', null, { type, at: new Date().toISOString(), userId: this.state.loggedIn ? this.userIdOf(this.state.phone) : null, deviceId: this.deviceId(), data: data || {} });
+  }
+  // ---- catalogue managed from the admin dashboard (admin.html) ----
+  DEFAULT_SERVICES = [
+    { id: 'refill', kind: 'refill', title: 'درخواست شارژ کپسول گاز', subtitle: 'عکس کپسول را بفرستید؛ تحویل درب منزل یا حضوری', active: true, builtIn: true, sort: 1 },
+    { id: 'used', kind: 'used', title: 'فروش تجهیزات', subtitle: 'تجهیزات خود را با قیمت پیشنهادی ثبت کنید', active: true, builtIn: true, sort: 2 },
+  ];
+  prodToDb(p, i) { return { id: p.id, title: p.title, cat: p.cat, gas: p.gas, price: p.price, stock: p.stock, isNew: !!p.new, active: true, desc: p.desc, specs: p.specs, art: this.ART_OF[p.id] || null, sort: i + 1 }; }
+  prodFromDb(d) {
+    return { id: d.id, title: d.title, cat: d.cat || 'acc', gas: d.gas || '', price: Math.max(0, +d.price || 0), vis: true,
+      stock: Math.max(0, +d.stock || 0), new: !!d.isNew, desc: d.desc || '', specs: Array.isArray(d.specs) ? d.specs : [], art: d.art || null };
+  }
+  // pull admin-managed data: catalogue (products, services) + statuses of this user's orders/requests
+  dbPull() {
+    const apply = (db) => {
+      if (!db || typeof db !== 'object') return;
+      const bySort = (a, b) => (+a.sort || 999) - (+b.sort || 999);
+      const prods = (Array.isArray(db.products) ? db.products : []).filter(p => p && p.id && p.title);
+      if (prods.length) this.PRODUCTS = prods.filter(p => p.active !== false).sort(bySort).map(p => this.prodFromDb(p));
+      const svcs = (Array.isArray(db.services) ? db.services : []).filter(v => v && v.id && v.title);
+      this.SERVICES = (svcs.length ? svcs : this.DEFAULT_SERVICES).slice().sort(bySort);
+      // ---- the signed-in customer's own records: the database is the source of truth ----
+      // (admin edits/deletes reach the app; with server.js the same account sees its records on any device)
+      const st = this.state, uid = st.loggedIn ? this.userIdOf(st.phone) : null;
+      let changed = false, patch = {};
+      if (uid) {
+        const users = Array.isArray(db.users) ? db.users : [], me = users.find(u => u.id === uid);
+        if (me) this._dbSeenUser = uid;
+        if (!me && this._dbSeenUser === uid) {           // the admin deleted this account → sign out
+          this._dbSeenUser = null;
+          this.dbAuth('logout', st.phone);
+          this.setState({ loggedIn: false, userName: '', phone: '', catalogRev: (st.catalogRev || 0) + 1 });
+          this.toast('حساب شما توسط پشتیبانی حذف شد');
+          return;
+        }
+        if (me && me.name && me.name !== st.userName) { patch.userName = me.name; this._dbSnap.name = me.name; changed = true; }
+        // a local record missing from the database was deleted by the admin — unless it was just created here
+        // and its upload hasn't been confirmed yet (then keep it for up to 2 minutes)
+        const pending = (r, tag) => !this._dbStored.has(tag) && r.ts && Date.now() - r.ts < 120000;
+        const sync = (localList, dbList, key, toLocal, pfx) => {
+          const mine = (Array.isArray(dbList) ? dbList : []).filter(d => d && d.userId === uid).map(toLocal);
+          const ids = new Set(mine.map(r => String(r[key])));
+          mine.forEach(r => this._dbStored.add(pfx + r[key])); 
+          const keep = localList.filter(r => !ids.has(String(r[key])) && pending(r, pfx + r[key]));
+          const next = mine.concat(keep).sort((a, b) => (b.ts || 0) - (a.ts || 0));
+          if (JSON.stringify(next) !== JSON.stringify(localList)) changed = true;
+          return next;
+        };
+        const strip = (d) => { const { id, userId, phone, customer, createdAt, updatedAt, statusHistory, ...rest } = d; return rest; };
+        patch.orders = sync(st.orders, db.orders, 'no', d => ({ ...strip(d), no: d.id }), 'o:');
+        patch.requests = sync(st.requests, db.serviceRequests, 'code', d => ({ ...strip(d), code: d.id }), 'r:');
+        // records that came from the database are already stored there: never re-POST them
+        patch.orders.forEach(o => this._dbSnap.orders.add(o.no));
+        patch.requests.forEach(r => this._dbSnap.requests.add(r.code));
+        if (!changed) { delete patch.orders; delete patch.requests; }
+      }
+      const ids = new Set(this.PRODUCTS.map(p => p.id)), cart = {}, wish = {};
+      let cartChanged = false;
+      Object.keys(st.cart).forEach(k => { if (ids.has(k)) cart[k] = st.cart[k]; else cartChanged = true; });
+      Object.keys(st.wish).forEach(k => { if (ids.has(k)) wish[k] = st.wish[k]; else cartChanged = true; });
+      if (cartChanged) Object.assign(patch, { cart, wish });
+      this.setState({ catalogRev: (st.catalogRev || 0) + 1, ...patch });
+    };
+    if (this._dbOnline) fetch(this.DB_API + '/db', { cache: 'no-store' }).then(r => (r.ok ? r.json() : null)).then(apply).catch(() => {});
+    else apply(this.dbMirror());
+  }
+  // first run: make sure the catalogue exists where the admin dashboard will read it
+  dbSeedCatalogue() {
+    const defaults = this.PRODUCTS.map((p, i) => this.prodToDb(p, i));
+    const m = this.dbMirror();
+    if (!m.products.length || !m.services.length) {
+      if (!m.products.length) m.products = defaults;
+      if (!m.services.length) m.services = this.DEFAULT_SERVICES;
+      try { localStorage.setItem(this.DB_LOCAL, JSON.stringify(m)); } catch (e) {}
+    }
+    if (this._dbOnline) fetch(this.DB_API + '/db', { cache: 'no-store' }).then(r => (r.ok ? r.json() : null)).then(db => {
+      if (!db) return;
+      const jobs = [];
+      if (!(db.products || []).length) defaults.forEach(p => jobs.push(fetch(this.DB_API + '/products/' + encodeURIComponent(p.id), { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(p) })));
+      if (!(db.services || []).length) this.DEFAULT_SERVICES.forEach(v => jobs.push(fetch(this.DB_API + '/services/' + v.id, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(v) })));
+      return Promise.all(jobs);
+    }).catch(() => {}).then(() => this.dbPull());
+    else this.dbPull();
+  }
+  dbInit() {
+    this._dbStored = new Set();   // 'o:<no>' / 'r:<code>' confirmed written to the database this session
+    // only probe where server.js can be running: not file://, not static hosting (GitHub Pages)
+    const httpish = /^https?:$/.test(location.protocol) && !/\.github\.io$/.test(location.hostname);
+    this._dbOnline = false;
+    this._dbProbe = !httpish ? Promise.resolve() : fetch(this.DB_API + '/health', { cache: 'no-store' })
+      .then(r => r.ok ? r.json() : null).then(j => { this._dbOnline = !!(j && j.ok); }).catch(() => {});
+    this._dbSnap = this.dbSnapshot();   // what is already stored (hydrated) is not re-sent as "new"
+    const self = this;
+    window.emdadDB = { dump: () => self.dbMirror(), online: () => !!self._dbOnline, api: self.DB_API, pull: () => self.dbPull() };
+    this.SERVICES = this.DEFAULT_SERVICES;
+    this._dbProbe.then(() => this.dbSeedCatalogue());
+    // live: admin changes (other tab via localStorage, or db.json via the server) reach the app
+    this._onDbStorage = (e) => { if (e.key === this.DB_LOCAL && !this._dbOnline) this.dbPull(); };
+    this._onDbFocus = () => { if (document.visibilityState !== 'hidden') this.dbPull(); };
+    window.addEventListener('storage', this._onDbStorage);
+    document.addEventListener('visibilitychange', this._onDbFocus);
+    this._dbPollT = setInterval(() => { if (document.visibilityState === 'visible') this.dbPull(); }, 15000);
+  }
+  dbSnapshot() {
+    const s = this.state;
+    return {
+      owner: this.dbOwner(), cart: JSON.stringify(s.cart), wish: JSON.stringify(s.wish), addr: JSON.stringify(s.addresses),
+      orders: new Set(s.orders.map(o => o.no)), requests: new Set(s.requests.map(r => r.code)),
+      name: s.userName, theme: this.theme(), q: s.q, cat: s.cat,
+    };
+  }
+  // called after every committed state change: diff against the last snapshot and write what changed
+  dbSync() {
+    if (!this._dbSnap) return;
+    const s = this.state, prev = this._dbSnap, now = this.dbSnapshot(), owner = now.owner;
+    const userId = s.loggedIn ? this.userIdOf(s.phone) : null;
+    const prod = (id) => this.PRODUCTS.find(p => p.id === id) || {};
+    if (now.cart !== prev.cart || owner !== prev.owner) {
+      const items = Object.entries(s.cart).map(([pid, qty]) => ({ pid, title: prod(pid).title || pid, qty, unitPrice: prod(pid).price || 0 }));
+      this.dbWrite('PUT', 'carts', owner, { ownerId: owner, userId, deviceId: this.deviceId(), items, count: items.reduce((a, i) => a + i.qty, 0) });
+      if (now.cart !== prev.cart) this.dbLog('cart.update', { items });
+    }
+    if (now.wish !== prev.wish || owner !== prev.owner) {
+      const items = Object.keys(s.wish).filter(k => s.wish[k]).map(pid => ({ pid, title: prod(pid).title || pid }));
+      this.dbWrite('PUT', 'wishlists', owner, { ownerId: owner, userId, items });
+      if (now.wish !== prev.wish) this.dbLog('wishlist.update', { items });
+    }
+    if (now.addr !== prev.addr || owner !== prev.owner) {
+      this.dbWrite('PUT', 'addressBooks', owner, { ownerId: owner, userId, addresses: s.addresses });
+      if (now.addr !== prev.addr) this.dbLog('address.update', { count: s.addresses.length });
+    }
+    s.orders.filter(o => !prev.orders.has(o.no)).forEach(o => {
+      this.dbWrite('POST', 'orders', null, { ...o, id: o.no, userId, phone: s.phone, customer: s.userName }).then(res => { if (res || !this._dbOnline) this._dbStored.add('o:' + o.no); });
+      if (o.payRef) {
+        this.dbWrite('POST', 'payments', null, { id: o.payRef, orderNo: o.no, userId, amount: o.total, currency: 'IRT', method: 'online', status: 'paid', cardMasked: o.payCard, at: new Date(o.ts).toISOString() });
+        this.dbLog('payment.success', { orderNo: o.no, ref: o.payRef, amount: o.total });
+      }
+      this.dbLog('order.place', { no: o.no, total: o.total });
+    });
+    s.requests.filter(r => !prev.requests.has(r.code)).forEach(r => {
+      this.dbWrite('POST', 'serviceRequests', null, { ...r, id: r.code, userId, phone: s.phone, customer: s.userName }).then(res => { if (res || !this._dbOnline) this._dbStored.add('r:' + r.code); });
+      this.dbLog('service.request', { code: r.code, kind: r.kind });
+    });
+    if (s.loggedIn && userId && now.name !== prev.name && prev.owner === owner) {
+      this.dbWrite('PATCH', 'users', userId, { name: s.userName });
+      this.dbLog('profile.rename', { name: s.userName });
+    }
+    if (now.theme !== prev.theme) this.dbLog('settings.theme', { theme: now.theme });
+    if (now.cat !== prev.cat) this.dbLog('catalog.filter', { cat: now.cat });
+    if (now.q !== prev.q && (now.q || '').trim()) this.dbLog('catalog.search', { q: now.q.trim() });
+    this._dbSnap = now;
+  }
+  // explicit auth records: signup (first verified login of a phone) vs login, plus logout
+  dbAuth(kind, phone, extra) {
+    const userId = this.userIdOf(phone); if (!userId) return;
+    const at = new Date().toISOString();
+    if (kind === 'logout') {
+      this.dbWrite('POST', 'sessions', null, { userId, phone, type: 'logout', at, deviceId: this.deviceId() });
+      this.dbLog('auth.logout', { userId });
+      return;
+    }
+    const knewLocally = this.dbMirror().users.some(u => u.id === userId);
+    const prevCount = (this.dbMirror().users.find(u => u.id === userId) || {}).loginCount || 0;
+    this.dbWrite('PATCH', 'users', userId, { phone, ...extra, lastLoginAt: at, loginCount: prevCount + 1 }).then(res => {
+      const type = res ? (res.created ? 'signup' : 'login') : (knewLocally ? 'login' : 'signup');
+      this.dbWrite('POST', 'sessions', null, { userId, phone, type, at, deviceId: this.deviceId() });
+      this.dbLog('auth.' + type, { userId });
+    });
+  }
+
+  // ---------- contact sheet (notes 13-Nov #9/#10) ----------
+  // Shown by the support button. Edit these values to match the official Emdad Oxygen website.
+  // TODO(content): the street address could not be fetched from the website in this session —
+  // replace `address` (and optionally `mapQuery` with exact coordinates "lat,lng").
+  CONTACT = {
+    tel: '+989191002030', phoneLabel: '۰۹۱۹ ۱۰۰ ۲۰۳۰',
+    address: 'تهران — نشانی دقیق از طریق تماس تلفنی',
+    hours: 'پاسخگویی شبانه‌روزی، ۷ روز هفته',
+    mapQuery: 'امداد اکسیژن تهران',
+  };
+
   // ---------- delivery scheduling (P7) ----------
   SLOTS = [['s1', '۹ تا ۱۲'], ['s2', '۱۲ تا ۱۵'], ['s3', '۱۵ تا ۱۸'], ['s4', '۱۸ تا ۲۱']];
   slotLabel(k) { const f = this.SLOTS.find(x => x[0] === k); return f ? f[1] : ''; }
@@ -601,28 +884,52 @@ class Component extends DCLogic {
     return 'flex:none;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;min-width:70px;height:54px;padding:0 12px;border-radius:14px;cursor:pointer;'
       + 'border:1.5px solid ' + (sel ? 'var(--p)' : 'var(--line)') + ';background:' + (sel ? 'var(--p-soft)' : 'var(--sur)') + ';color:' + (sel ? 'var(--p)' : 'var(--tx)');
   }
-  slotChipStyle(sel) {
-    return 'display:flex;align-items:center;justify-content:center;gap:6px;height:46px;border-radius:14px;cursor:pointer;font-weight:700;font-size:12.5px;'
-      + 'border:1.5px solid ' + (sel ? 'var(--p)' : 'var(--line)') + ';background:' + (sel ? 'var(--p-soft)' : 'var(--sur)') + ';color:' + (sel ? 'var(--p)' : 'var(--tx)');
+  slotChipStyle(sel, past) {
+    return 'display:flex;align-items:center;justify-content:center;gap:6px;height:46px;border-radius:14px;cursor:' + (past ? 'not-allowed' : 'pointer') + ';font-weight:700;font-size:12.5px;'
+      + 'border:1.5px solid ' + (sel ? 'var(--p)' : 'var(--line)') + ';background:' + (sel ? 'var(--p-soft)' : 'var(--sur)') + ';color:' + (sel ? 'var(--p-ink)' : 'var(--tx)')
+      + (past ? ';opacity:.42;text-decoration:line-through' : '');
   }
+  SLOT_START = { s1: 9, s2: 12, s3: 15, s4: 18 };
+  slotPast(day, key) { return day === 0 && new Date().getHours() >= this.SLOT_START[key]; }
+  // the slot actually in effect: the chosen one if still open, else the first open slot that day
+  // the slot actually in effect: only an explicitly chosen slot that is still open (delivery time is
+  // OPTIONAL — notes 13-Nov #11 — so nothing is preselected; '' means "coordinate by phone")
+  effSlot(day, slot) { return slot && !this.slotPast(day, slot) ? slot : ''; }
+  deliveryOrPhone(day, slot) { const k = this.effSlot(day, slot); return k ? this.deliveryLabel(day, k) : 'هماهنگی تلفنی'; }
   ctaStyle(bg, fg, busy) {
     return 'pointer-events:' + (busy ? 'none' : 'auto') + ';display:flex;align-items:center;justify-content:center;width:100%;height:50px;border:none;border-radius:999px;background:'
       + bg + ';color:' + fg + ';font-weight:800;font-size:14.5px;cursor:' + (busy ? 'default' : 'pointer')
       + ';box-shadow:var(--shadow);opacity:' + (busy ? '.72' : '1');
   }
   validPhone(s) { const d = this.deFa(s); return /^(0|98|098|0098)?9\d{9}$/.test(d); }
-  showPrice(p) { return (this.props.showPrices ?? true) && p.vis; }
+  showPrice(p) { return (this.props.showPrices ?? true) && p.price > 0; }   // every product is priced (no price inquiries)
   catLabel(id) { const c = this.CATS.find(c => c.id === id); return c ? c.label : ''; }
 
   toast(msg) {
     clearTimeout(this._toastT);
+    this._toastAt = performance.now();
     this.setState({ toastMsg: msg, toastShow: true });
-    this._toastT = setTimeout(() => this.setState({ toastShow: false }), 2400);
+    this.announce(msg);
+    this._toastT = setTimeout(() => this.setState({ toastShow: false }), 3200);
+  }
+  // One persistent, visually-hidden polite live region (created once). A role=status node that is
+  // mounted together with its text (the old toast) is skipped by many screen readers.
+  announce(msg) {
+    let el = this._liveEl;
+    if (!el || !el.isConnected) {
+      el = this._liveEl = document.createElement('div');
+      el.setAttribute('role', 'status'); el.setAttribute('aria-live', 'polite');
+      el.style.cssText = 'position:absolute;width:1px;height:1px;margin:-1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap';
+      document.body.appendChild(el);
+    }
+    el.textContent = '';
+    clearTimeout(this._liveT);
+    this._liveT = setTimeout(() => { el.textContent = msg; }, 60);
   }
 
-  DEPTH = { home:0, products:0, services:0, cart:0, profile:0, detail:1, checkout:1, auth:1, refill:1, usedSale:1, orders:1, requests:1, inquiries:1, addresses:1, wishlist:1, orderDetail:2, requestDetail:2, success:2, formSuccess:2 };
+  DEPTH = { home:0, products:0, services:0, cart:0, profile:0, detail:1, checkout:1, payment:2, auth:1, refill:1, usedSale:1, orders:1, requests:1, addresses:1, wishlist:1, orderDetail:2, requestDetail:2, success:2, formSuccess:2 };
   TAB_ORDER = ['home', 'products', 'services', 'cart', 'profile'];
-  ROUTE_TAB = { home:'home', products:'products', detail:'products', cart:'cart', checkout:'cart', success:'cart', services:'services', refill:'services', usedSale:'services', formSuccess:'services', profile:'profile', orders:'profile', requests:'profile', inquiries:'profile', orderDetail:'profile', requestDetail:'profile', addresses:'profile', wishlist:'profile', auth:'profile' };
+  ROUTE_TAB = { home:'home', products:'products', detail:'products', cart:'cart', checkout:'cart', payment:'cart', success:'cart', services:'services', refill:'services', usedSale:'services', formSuccess:'services', profile:'profile', orders:'profile', requests:'profile', orderDetail:'profile', requestDetail:'profile', addresses:'profile', wishlist:'profile', auth:'profile' };
   tabOf(route) { return this.ROUTE_TAB[route] || 'home'; }
   // Wrap a route change in a directional View Transition (SPA equivalent of @view-transition).
   nav(patch, dir) {
@@ -857,7 +1164,8 @@ class Component extends DCLogic {
   closeOverlays() {
     const s = this.state;
     if (s.addrSheet) this.setState({ addrSheet: null, addrSheetTarget: null });
-    else if (s.inqSheet) this.setState({ inqSheet: false, inqPid: null });
+    else if (s.contactOpen) this.setState({ contactOpen: false });
+    else if (s.rfTimeOpen) this.setState({ rfTimeOpen: false });
     else if (s.sheet) this.setState({ sheet: false });
     else if (s.addrMenuId != null) this.setState({ addrMenuId: null });
   }
@@ -937,22 +1245,24 @@ class Component extends DCLogic {
   vm(p) {
     const show = this.showPrice(p);
     return {
-      id: p.id, title: p.title, isNew: !!p.new,
+      id: p.id, title: p.title.replace(/([۰-۹]+) /g, '$1\u00a0'), isNew: !!p.new,
       meta: p.gas + ' · ' + this.catLabel(p.cat),
-      hasPrice: show, inquiry: !show,
+      hasPrice: show,
       priceLabel: show ? this.fmt(p.price) : '',
       out: p.stock <= 0,
       canAdd: show && p.stock > 0,
       open: (e) => this.openMorph(p.id, e),
       add: (e) => { if (e && e.stopPropagation) e.stopPropagation(); if (p.stock > 0) { const c = e && e.currentTarget && e.currentTarget.closest('[data-pid]'); this.addToCart(p.id, 1, c && c.firstElementChild); } },
-      inquire: (e) => { if (e && e.stopPropagation) e.stopPropagation(); this.setState({ inqSheet: true, inqPid: p.id }); },
       unwish: (e) => { if (e && e.stopPropagation) e.stopPropagation(); const w = { ...this.state.wish }; delete w[p.id]; this.vtState({ wish: w }); }
     };
   }
 
   // ---------- auth ----------
-  goAuthFor(returnRoute, from, pending) {
-    this.go({ route: 'auth', authStep: 'phone', otp: '', authErr: '', authReturn: returnRoute, authFrom: from, pendingSubmit: pending || null });
+  goAuthFor(returnRoute, from, pending, step) {
+    const known = (this.state.userName && this.state.userName !== 'کاربر امداد اکسیژن') ? this.state.userName.split(' ') : null;
+    if (known && !this.state.authFirst) this.setState({ authFirst: known[0] || '', authLast: known.slice(1).join(' ') });
+    this.go({ route: 'auth', authStep: step || 'phone', otp: '', authErr: '', authReturn: returnRoute, authFrom: from, pendingSubmit: pending || null });
+    if (step === 'code') this.startCountdown();
   }
   startCountdown() {
     clearInterval(this._cd);
@@ -963,7 +1273,9 @@ class Component extends DCLogic {
     }, 1000);
   }
   sendOtp = () => {
+    if (this.state.authFirst.trim().length < 2 || this.state.authLast.trim().length < 2) { this.setState({ authErr: 'نام و نام خانوادگی را وارد کنید' }); return; }
     if (!this.validPhone(this.state.authPhone)) { this.setState({ authErr: 'شماره موبایل معتبر ایران وارد کنید (مثلاً 09123456789)' }); return; }
+    this.dbLog('auth.otp_requested', { phone: this.deFa(this.state.authPhone) });
     this.setState({ authStep: 'code', authErr: '', otp: '' });
     this.startCountdown();
     this.toast('کد تأیید پیامک شد');
@@ -977,9 +1289,11 @@ class Component extends DCLogic {
     const pretty = '0' + phone.slice(-10, -7) + ' ' + phone.slice(-7, -4) + ' ' + phone.slice(-4);
     const pending = this.state.pendingSubmit;
     this.setState({
-      loggedIn: true, userName: this.state.userName || 'کاربر امداد اکسیژن',
+      loggedIn: true, userName: (this.state.authFirst.trim() + ' ' + this.state.authLast.trim()).trim() || this.state.userName || 'کاربر امداد اکسیژن',
       phone: pretty, authErr: '', otp: '', resendIn: 0, pendingSubmit: null
     }, () => {
+      this.dbAuth('login', pretty, { firstName: this.state.authFirst.trim(), lastName: this.state.authLast.trim(), name: this.state.userName });
+      setTimeout(() => this.dbPull(), 400);   // load this account's orders/requests (e.g. from another device)
       this.toast('با موفقیت وارد شدید');
       if (pending === 'refill') this.completeRefill();
       else if (pending === 'used') this.completeUsed();
@@ -993,7 +1307,7 @@ class Component extends DCLogic {
     if (!this.commitGuard()) return;
     const c = this.code('RC');
     this.go({
-      requests: [{ kind: 'refill', code: c, date: this.todayFa(), ts: Date.now(), delivery: this.deliveryLabel(this.state.rfDay, this.state.rfSlot), gas: this.state.rfGas, notes: this.state.rfNotes }, ...this.state.requests],
+      requests: [{ kind: 'refill', code: c, date: this.todayFa(), ts: Date.now(), delivery: this.deliveryOrPhone(this.state.rfDay, this.state.rfSlot), gas: '', notes: this.state.rfNotes }, ...this.state.requests],
       route: 'formSuccess', fsKind: 'refill', fsCode: c, busy: '',
       rfPhotoList: [], rfGas: '', rfDelivery: '', rfAddr: '', rfNotes: '', rfDay: 0, rfSlot: '', rfErrs: {}
     });
@@ -1007,31 +1321,16 @@ class Component extends DCLogic {
       usPhotoList: [], usPrice: '', usDesc: '', usErrs: {}
     });
   }
-  // Price-inquiry confirm→commit: the detail CTA opens a confirm sheet (state.inqSheet); confirming
-  // here records the inquiry (like a refill/used request) and lands on the shared formSuccess screen.
-  // No instant submit anywhere — the card opens detail, detail opens this sheet.
-  confirmInquiry = () => {
-    const p = this.PRODUCTS.find(x => x.id === this.state.inqPid);
-    if (!p) { this.setState({ inqSheet: false, inqPid: null }); return; }
-    if (!this.commitGuard()) return;
-    const c = this.code('IQ');
-    this.go({
-      inquiries: [{ pid: p.id, title: p.title, code: c, date: this.todayFa(), ts: Date.now() }, ...this.state.inquiries],
-      route: 'formSuccess', fsKind: 'inquiry', fsCode: c, inqSheet: false, inqPid: null, busy: ''
-    });
-  };
   submitRefill = () => {
     if (this.state.busy) return;
     const s = this.state, errs = {};
-    if (s.rfPhotoList.length < 1) errs.photos = 'حداقل یک تصویر از کپسول اضافه کنید';
-    if (!s.rfGas) errs.gas = 'نوع گاز را انتخاب کنید';
+    // notes 13-Nov: photo optional (#7), gas type removed (#6), delivery time optional (#8/#11),
+    // phone field removed — the verified login number is used (#12)
     if (!s.rfDelivery) errs.delivery = 'نوع ارسال را انتخاب کنید';
-    if (!s.rfSlot) errs.slot = 'بازهٔ زمانی تحویل را انتخاب کنید';
     if (s.rfDelivery === 'home' && !s.loggedIn && s.rfAddr.trim().length < 10) errs.addr = 'آدرس کامل تحویل را وارد کنید';
-    if (!this.validPhone(s.rfPhone)) errs.phone = 'شماره موبایل معتبر وارد کنید';
     this.setState({ rfErrs: errs });
-    if (Object.keys(errs).length) { this.toast('لطفاً موارد مشخص‌شده را تکمیل کنید'); return; }
-    if (!s.loggedIn) { this.setState({ authPhone: s.rfPhone }); this.goAuthFor('refill', 'refill', 'refill'); this.toast('برای تأیید شماره، کد پیامکی ارسال می‌شود'); return; }
+    if (Object.keys(errs).length) { this.toast('لطفاً موارد مشخص‌شده را تکمیل کنید'); this.revealFirstError(); return; }
+    if (!s.loggedIn) { this.goAuthFor('refill', 'refill', 'refill'); this.toast('برای ثبت درخواست، ابتدا وارد شوید'); return; }
     this.setState({ busy: 'refill' });
     this._busyT = setTimeout(() => this.completeRefill(), 850);
   };
@@ -1039,15 +1338,13 @@ class Component extends DCLogic {
     if (this.state.busy) return;
     const s = this.state, errs = {};
     const price = parseInt(this.deFa(s.usPrice) || '0', 10);
-    if (s.usPhotoList.length < 1) errs.photos = 'حداقل یک تصویر از محصول اضافه کنید';
     if (!price || price <= 0) errs.price = 'قیمت پیشنهادی را به تومان وارد کنید';
-    if (!this.validPhone(s.usPhone)) errs.phone = 'شماره موبایل معتبر وارد کنید';
     const dl = s.usDesc.trim().length;
     if (dl < 10) errs.desc = 'توضیحات حداقل ۱۰ کاراکتر باشد';
     if (dl > 1000) errs.desc = 'توضیحات حداکثر ۱۰۰۰ کاراکتر است';
     this.setState({ usErrs: errs });
-    if (Object.keys(errs).length) { this.toast('لطفاً موارد مشخص‌شده را تکمیل کنید'); return; }
-    if (!s.loggedIn) { this.setState({ authPhone: s.usPhone }); this.goAuthFor('usedSale', 'usedSale', 'used'); this.toast('برای تأیید شماره، کد پیامکی ارسال می‌شود'); return; }
+    if (Object.keys(errs).length) { this.toast('لطفاً موارد مشخص‌شده را تکمیل کنید'); this.revealFirstError(); return; }
+    if (!s.loggedIn) { this.goAuthFor('usedSale', 'usedSale', 'used'); this.toast('برای ثبت درخواست، ابتدا وارد شوید'); return; }
     this.setState({ busy: 'used' });
     this._busyT = setTimeout(() => this.completeUsed(), 850);
   };
@@ -1103,12 +1400,52 @@ class Component extends DCLogic {
     }
   };
 
+  // Checkout CTA → the payment page. The order is created ONLY after a successful online payment.
   placeOrder = () => {
     if (this.state.busy) return;
-    if (!this.state.coSlot) { this.toast('یک بازهٔ زمانی تحویل انتخاب کنید'); return; }
+    if (!this.cartTotals().count) { this.go({ route: 'cart' }); return; }
     if (!this.commitGuard()) return;
-    this.setState({ busy: 'order' });                 // show loading, then commit (simulated server round-trip)
-    this._busyT = setTimeout(() => this._commitOrder(), 850);
+    this.go({ route: 'payment', ...this.PAY_RESET });
+    this.dbLog('payment.start', { amount: this.cartTotals().total });
+  };
+  // ---------- payment (simulated online gateway; no real money) ----------
+  // Card data stays in transient state only and is wiped after pay/cancel; orders and db.json keep
+  // just the masked card number and the tracking code.
+  PAY_RESET = { payCard: '', payCvv: '', payMonth: '', payYear: '', payPin: '', payPinSent: '', payErr: '' };
+  luhnOk(d) { let sum = 0; for (let i = 0; i < d.length; i++) { let n = +d[d.length - 1 - i]; if (i % 2) { n *= 2; if (n > 9) n -= 9; } sum += n; } return sum % 10 === 0; }
+  cardDigits() { return this.deFa(this.state.payCard).replace(/\D/g, ''); }
+  maskCard(d) { return d.slice(0, 4) + ' ' + d.slice(4, 6) + '** **** ' + d.slice(-4); }
+  payRequestPin = () => {
+    const d = this.cardDigits();
+    if (d.length !== 16 || !this.luhnOk(d)) { this.setState({ payErr: 'ابتدا شماره کارت ۱۶ رقمی معتبر را وارد کنید' }); return; }
+    const pin = String(Math.floor(100000 + Math.random() * 900000));
+    this.setState({ payPinSent: pin, payErr: '' });
+    this.toast('رمز پویا (آزمایشی): ' + this.fmtDigits(pin));
+  };
+  fmtDigits(x) { return String(x).replace(/\d/g, c => '۰۱۲۳۴۵۶۷۸۹'[c]); }
+  paySubmit = () => {
+    const s = this.state;
+    if (s.busy) return;
+    if (!this.cartTotals().count) { this.go({ route: 'cart', ...this.PAY_RESET }); return; }
+    const d = this.cardDigits(), cvv = this.deFa(s.payCvv).replace(/\D/g, ''), mm = +this.deFa(s.payMonth), yy = this.deFa(s.payYear).replace(/\D/g, '');
+    const pin = this.deFa(s.payPin).replace(/\D/g, '');
+    let err = '';
+    if (d.length !== 16 || !this.luhnOk(d)) err = 'شماره کارت معتبر نیست';
+    else if (cvv.length < 3 || cvv.length > 4) err = 'CVV2 را درست وارد کنید (۳ یا ۴ رقم)';
+    else if (!(mm >= 1 && mm <= 12) || yy.length !== 2) err = 'تاریخ انقضا را درست وارد کنید';
+    else if (!s.payPinSent) err = 'ابتدا «دریافت رمز پویا» را بزنید';
+    else if (pin !== s.payPinSent) err = 'رمز پویا نادرست است';
+    if (err) { this.setState({ payErr: err }); this.dbLog('payment.error', { reason: err }); return; }
+    if (!this.commitGuard()) return;
+    this._pendingPay = { payRef: String(Math.floor(1e11 + Math.random() * 9e11)), payCard: this.maskCard(d), paidAt: Date.now() };
+    this.setState({ busy: 'order', payErr: '' });            // simulated bank round-trip, then commit the order
+    this._busyT = setTimeout(() => this._commitOrder(), 1200);
+  };
+  payCancel = () => {
+    if (this.state.busy) return;
+    this.dbLog('payment.cancel', { amount: this.cartTotals().total });
+    this.go({ route: 'checkout', ...this.PAY_RESET });
+    this.toast('پرداخت لغو شد — سفارشی ثبت نشد');
   };
   _commitOrder() {
     if (this.state.busy !== 'order') return;
@@ -1125,12 +1462,14 @@ class Component extends DCLogic {
       no, date: this.todayFa(), ts: Date.now(), count: t.count,
       subtotal: t.subtotal, disc: t.disc, discCode: s.disc || '', total: t.total,
       items, note: s.note || '', addrTitle: addr ? addr.title : '', addrText: addr ? addr.text : '',
-      delivery: this.deliveryLabel(s.coDay, s.coSlot)
+      delivery: this.deliveryOrPhone(s.coDay, s.coSlot),
+      ...(this._pendingPay ? { paid: true, payMethod: 'online', ...this._pendingPay } : {})
     };
+    this._pendingPay = null;
     // Land on the itemized order-detail page (odFresh → shows the success moment), NOT the orders list.
     this.go({
       route: 'orderDetail', odId: no, odFresh: true, orderNo: no,
-      cart: {}, disc: null, discInput: '', note: '', busy: '', coSlot: '', coDay: 0,
+      cart: {}, disc: null, discInput: '', note: '', busy: '', coSlot: '', coDay: 0, ...this.PAY_RESET,
       orders: [order, ...s.orders]
     });
   }
@@ -1169,7 +1508,7 @@ class Component extends DCLogic {
       label: c.label,
       pick: () => this.vtState({ cat: c.id }),
       style: chipBase + (s.cat === c.id
-        ? 'border:1px solid var(--p);background:var(--p-soft);color:var(--p)'
+        ? 'border:1px solid var(--p);background:var(--p-soft);color:var(--p-ink)'
         : 'border:1px solid var(--line);background:var(--sur);color:var(--tx2)')
     }));
 
@@ -1177,7 +1516,7 @@ class Component extends DCLogic {
       label: g,
       pick: () => this.setState({ rfGas: g, rfErrs: { ...s.rfErrs, gas: '' } }),
       style: chipBase + (s.rfGas === g
-        ? 'border:1px solid var(--p);background:var(--p-soft);color:var(--p)'
+        ? 'border:1px solid var(--p);background:var(--p-soft);color:var(--p-ink)'
         : 'border:1px solid var(--line);background:var(--sur);color:var(--tx2)')
     }));
 
@@ -1257,7 +1596,7 @@ class Component extends DCLogic {
     const rfTiles = tiles(s.rfPhotoList, 'rfPhotoList');
     const usTiles = tiles(s.usPhotoList, 'usPhotoList');
 
-    const navBase = 'position:relative;z-index:1;display:flex;flex-direction:column;align-items:center;gap:3px;padding:var(--sp-2) 0;border:none;background:none;cursor:pointer;border-radius:var(--r-sm);';
+    const navBase = 'position:relative;z-index:1;display:flex;flex-direction:column;align-items:center;gap:2px;padding:7px 0 6px;border:none;background:none;cursor:pointer;border-radius:var(--r-sm);';
     const navDefs = [
       { key: 'home', label: 'خانه', d: 'M3 10.5L12 3l9 7.5V20a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1z', go: () => this.go({ route: 'home' }) },
       { key: 'products', label: 'محصولات', d: 'M4 4h7v7H4zM13 4h7v7h-7zM4 13h7v7H4zM13 13h7v7h-7z', go: () => this.go({ route: 'products' }) },
@@ -1267,16 +1606,16 @@ class Component extends DCLogic {
     ];
     const activeMap = {
       home: 'home', products: 'products', detail: 'products',
-      cart: 'cart', checkout: 'cart', success: 'cart',
+      cart: 'cart', checkout: 'cart', payment: 'cart', success: 'cart',
       services: 'services', refill: 'services', usedSale: 'services', formSuccess: 'services',
-      profile: 'profile', orders: 'profile', requests: 'profile', inquiries: 'profile', orderDetail: 'profile', requestDetail: 'profile', addresses: 'profile', wishlist: 'profile', auth: 'profile'
+      profile: 'profile', orders: 'profile', requests: 'profile', orderDetail: 'profile', requestDetail: 'profile', addresses: 'profile', wishlist: 'profile', auth: 'profile'
     };
     const activeKey = route === 'auth' ? (activeMap[s.authFrom] || 'profile') : (activeMap[route] || 'home');
     const pillIdx = Math.max(0, this.TAB_ORDER.indexOf(activeKey));
-    const navPillStyle = 'position:absolute;top:6px;bottom:calc(6px + env(safe-area-inset-bottom));inset-inline-start:calc(8px + ' + pillIdx + ' * (100% - 16px) / 5);width:calc((100% - 16px) / 5);background:var(--p-soft);border-radius:14px;pointer-events:none;z-index:0;transition:inset-inline-start .34s var(--ease-emphasized)';
+    const navPillStyle = 'position:absolute;top:6px;bottom:6px;inset-inline-start:calc(6px + ' + pillIdx + ' * (100% - 12px) / 5);width:calc((100% - 12px) / 5);background:color-mix(in oklab, var(--p) 16%, transparent);box-shadow:inset 0 1px 0 rgba(255,255,255,.35), inset 0 0 0 .5px color-mix(in oklab, var(--p) 30%, transparent);border-radius:26px;pointer-events:none;z-index:0;transition:inset-inline-start .42s cubic-bezier(.3,1.35,.5,1)';
     const navs = navDefs.map(n => ({
       ...n,
-      style: navBase + (n.key === activeKey ? 'color:var(--p);font-weight:800' : 'color:var(--tx2)'),
+      style: navBase + (n.key === activeKey ? 'color:var(--p-ink);font-weight:800' : 'color:var(--tx2)'),
       current: n.key === activeKey ? 'page' : 'false',   // aria-current on the active tab (a11y)
       showBadge: n.key === 'cart' && t.count > 0,
       badge: this.fmt(t.count)
@@ -1284,12 +1623,11 @@ class Component extends DCLogic {
 
     const reqChip = (kind) => kind === 'warn'
       ? 'font-size:10.5px;font-weight:700;color:var(--warn);background:var(--warn-soft);padding:4px 12px;border-radius:999px'
-      : 'font-size:10.5px;font-weight:700;color:var(--p);background:var(--p-soft);padding:4px 12px;border-radius:999px';
+      : 'font-size:10.5px;font-weight:700;color:var(--p-ink);background:var(--p-soft);padding:4px 12px;border-radius:999px';
 
     const menuRows = [
       { label: 'سفارش‌های من', d: 'M4 7h16l-1.5 13h-13L4 7zM8 7a4 4 0 0 1 8 0', go: () => this.go({ route: 'orders' }), count: this.fmt(s.orders.length), hasCount: s.orders.length > 0 },
       { label: 'درخواست‌های خدمت', d: 'M9 3h6M12 3v4M8 7h8v13a1 1 0 0 1-1 1H9a1 1 0 0 1-1-1z', go: () => this.go({ route: 'requests' }), count: this.fmt(s.requests.length), hasCount: s.requests.length > 0 },
-      { label: 'استعلام‌های قیمت', d: 'M11 4a7 7 0 1 0 0 14 7 7 0 0 0 0-14zM20 21l-4.35-4.35', go: () => this.go({ route: 'inquiries' }), count: this.fmt(s.inquiries.length), hasCount: s.inquiries.length > 0 },
       { label: 'علاقه‌مندی‌ها', d: 'M12 20.5s-7.2-4.6-9.3-8.4C1 9.1 2.7 6.2 5.7 5.8c1.9-.3 3.5.6 4.4 2h3.8c.9-1.4 2.5-2.3 4.4-2 3 .4 4.7 3.3 3 6.3-2.1 3.8-9.3 8.4-9.3 8.4z', go: () => this.go({ route: 'wishlist' }), count: this.fmt(Object.keys(s.wish).length), hasCount: Object.keys(s.wish).length > 0 },
       { label: 'آدرس‌های من', d: 'M12 21s-7-5.3-7-11a7 7 0 0 1 14 0c0 5.7-7 11-7 11zM12 12.5a2.5 2.5 0 1 0 0-5 2.5 2.5 0 0 0 0 5z', go: () => this.go({ route: 'addresses' }), count: this.fmt(s.addresses.length), hasCount: true }
     ];
@@ -1298,20 +1636,24 @@ class Component extends DCLogic {
     const price = parseInt(this.deFa(s.usPrice) || '0', 10);
     // Support FAB: lift it above the full-width fixed bottom CTA on screens that have one, so the
     // two never overlap; otherwise it rests just above the bottom nav.
-    const hasBottomCta = (route === 'cart' && t.count > 0) || route === 'checkout' || (route === 'detail' && (curVm.canAdd || curVm.out)) || route === 'refill' || route === 'usedSale' || route === 'services';
+    const hasBottomCta = (route === 'cart' && t.count > 0) || route === 'checkout' || route === 'payment' || (route === 'detail' && (curVm.canAdd || curVm.out)) || route === 'refill' || route === 'usedSale' || route === 'services';
     // Support pill shows only on the three browse pages (no bottom CTA to compete with); hidden elsewhere.
     const showFab = route === 'home' || route === 'products' || route === 'profile';
-    const fabStyle = 'position:fixed;z-index:40;inset-inline-end:16px;bottom:calc(' + (hasBottomCta ? '150px' : '86px') + ' + env(safe-area-inset-bottom));height:46px;padding:0 15px;border-radius:999px;background:var(--grad-cta);color:#fff;display:inline-flex;align-items:center;gap:8px;box-shadow:0 12px 26px -6px var(--glow);text-decoration:none;font-size:12px;font-weight:600;white-space:nowrap' + (showFab ? '' : ';display:none');
+    const fabStyle = 'border:none;cursor:pointer;font-family:inherit;position:fixed;z-index:45;inset-inline-end:16px;bottom:calc(' + (hasBottomCta ? '150px' : '86px') + ' + env(safe-area-inset-bottom));height:46px;padding:0 15px;border-radius:999px;background:var(--grad-cta);color:#fff;display:inline-flex;align-items:center;gap:8px;box-shadow:0 12px 26px -6px var(--glow);text-decoration:none;font-size:12px;font-weight:600;white-space:nowrap' + (showFab ? '' : ';display:none');
 
+    // Toast rides above whatever owns the bottom edge on this route (CTA bar / services card / pill / nav).
+    const toastBottom = route === 'services' ? 188 : hasBottomCta ? 150 : showFab ? 142 : 88;
+    const toastWrapStyle = 'position:fixed;bottom:calc(' + toastBottom + 'px + env(safe-area-inset-bottom));left:0;right:0;z-index:60;pointer-events:none;display:flex;justify-content:center';
     return {
       isHome: route === 'home', isProducts: route === 'products', isDetail: route === 'detail',
       isCart: route === 'cart', isCheckout: route === 'checkout', isSuccess: route === 'success',
       isAuth: route === 'auth', isServices: route === 'services', isRefill: route === 'refill',
       isUsed: route === 'usedSale', isFormSuccess: route === 'formSuccess',
-      isProfile: route === 'profile', isOrders: route === 'orders', isRequests: route === 'requests', isInquiries: route === 'inquiries',
+      isProfile: route === 'profile', isOrders: route === 'orders', isRequests: route === 'requests',
       isAddresses: route === 'addresses', isWishlist: route === 'wishlist',
       isDark: dark, isLight: !dark, isLogged: logged, isGuest: !logged,
       toggleTheme: (e) => this.themeVT(e, dark ? 'light' : 'dark'),
+      themeLabel: dark ? 'تغییر به حالت روشن' : 'تغییر به حالت تاریک', themeDarkStr: dark ? 'true' : 'false',
       goHome: () => this.go({ route: 'home' }),
       // Back from detail reverse-morphs the hero into its originating card thumbnail (M3); off the
       // detail route [data-hero-img] is absent so morphTo falls back to the plain back cover-slide.
@@ -1328,11 +1670,6 @@ class Component extends DCLogic {
       goProfile: () => this.go({ route: 'profile' }),
       goOrders: () => this.go({ route: 'orders' }),
       goRequests: () => this.go({ route: 'requests' }),
-      goInquiries: () => this.go({ route: 'inquiries' }),
-      inqSheetOpen: s.inqSheet,
-      inqProductTitle: (this.PRODUCTS.find(p => p.id === s.inqPid) || {}).title || '',
-      closeInqSheet: () => this.setState({ inqSheet: false, inqPid: null }),
-      confirmInquiry: this.confirmInquiry,
       goCheckout: () => {
         if (!logged) { this.goAuthFor('checkout', 'cart'); this.toast('برای ثبت سفارش ابتدا وارد شوید'); }
         else this.go({ route: 'checkout' });
@@ -1355,8 +1692,8 @@ class Component extends DCLogic {
       closeSheet: () => this.setState({ sheet: false }),
       stockSwitchStyle: 'display:inline-block;width:44px;height:26px;border-radius:var(--r-pill);position:relative;transition:background .2s;background:' + (s.inStock ? 'var(--p)' : 'var(--line)'),
       stockKnobStyle: 'position:absolute;top:3px;width:20px;height:20px;border-radius:var(--r-pill);background:#fff;transition:inset-inline-start .2s;inset-inline-start:' + (s.inStock ? '21px' : '3px'),
-      themeSwitchStyle: 'display:inline-block;width:44px;height:26px;border-radius:var(--r-pill);position:relative;transition:background .2s;cursor:pointer;background:' + (dark ? 'var(--p)' : 'var(--line)'),
-      themeKnobStyle: 'position:absolute;top:3px;width:20px;height:20px;border-radius:var(--r-pill);background:#fff;transition:inset-inline-start .2s;inset-inline-start:' + (dark ? '21px' : '3px'),
+      themeSwitchStyle: 'display:inline-block;flex:none;border:none;padding:0;width:51px;height:31px;border-radius:var(--r-pill);position:relative;transition:background .25s;cursor:pointer;background:' + (dark ? 'var(--switch-on)' : 'var(--fill)'),
+      themeKnobStyle: 'position:absolute;top:2px;width:27px;height:27px;border-radius:var(--r-pill);background:#fff;box-shadow:0 3px 8px rgba(0,0,0,.15),0 3px 1px rgba(0,0,0,.06);transition:inset-inline-start .25s cubic-bezier(.3,1.3,.5,1);inset-inline-start:' + (dark ? '22px' : '2px'),
 
       cur: curVm,
       related: this.PRODUCTS.filter(p => p.cat === cur.cat && p.id !== cur.id).slice(0, 2).map(p => this.vm(p)),
@@ -1421,8 +1758,20 @@ class Component extends DCLogic {
       placeOrder: this.placeOrder,
       // busy-aware submit CTAs (P6 loading states)
       busyOrder: s.busy === 'order', busyRefill: s.busy === 'refill', busyUsed: s.busy === 'used',
-      placeBtnLabel: s.busy === 'order' ? 'در حال ثبت سفارش…' : 'ثبت نهایی سفارش',
-      placeBtnStyle: this.ctaStyle('var(--p)', '#fff', s.busy === 'order'),
+      placeBtnLabel: 'ادامه و پرداخت',
+      placeBtnStyle: this.ctaStyle('var(--p)', '#fff', false),
+      // payment page
+      isPayment: route === 'payment', busyPay: s.busy === 'order',
+      payAmountLabel: this.fmt(t.total), payItemsLabel: this.fmt(t.count) + ' کالا · سفارش امداد اکسیژن',
+      payCard: s.payCard, onPayCard: (e) => this.setState({ payCard: e.target.value, payErr: '' }),
+      payCvv: s.payCvv, onPayCvv: (e) => this.setState({ payCvv: e.target.value, payErr: '' }),
+      payMonth: s.payMonth, onPayMonth: (e) => this.setState({ payMonth: e.target.value, payErr: '' }),
+      payYear: s.payYear, onPayYear: (e) => this.setState({ payYear: e.target.value, payErr: '' }),
+      payPin: s.payPin, onPayPin: (e) => this.setState({ payPin: e.target.value, payErr: '' }),
+      payErr: s.payErr, payRequestPin: this.payRequestPin, paySubmit: this.paySubmit, payCancel: this.payCancel,
+      payPinBtnLabel: s.payPinSent ? 'ارسال دوباره' : 'دریافت رمز پویا',
+      payBtnLabel: s.busy === 'order' ? 'در حال اتصال به بانک…' : 'پرداخت ' + this.fmt(t.total) + ' تومان',
+      payBtnStyle: this.ctaStyle('var(--p)', '#fff', s.busy === 'order'),
       refillBtnLabel: s.busy === 'refill' ? 'در حال ارسال درخواست…' : 'ثبت درخواست شارژ',
       refillBtnStyle: this.ctaStyle('var(--acc)', '#06343a', s.busy === 'refill'),
       usedBtnLabel: s.busy === 'used' ? 'در حال ارسال پیشنهاد…' : 'ثبت پیشنهاد فروش',
@@ -1433,7 +1782,9 @@ class Component extends DCLogic {
       // auth
       authPhoneStep: s.authStep === 'phone', authCodeStep: s.authStep === 'code',
       authPhone: s.authPhone, onAuthPhone: (e) => this.setState({ authPhone: this.deFa(e.target.value), authErr: '' }),
-      otp: s.otp, onOtp: (e) => this.setState({ otp: e.target.value.slice(0, 6), authErr: '' }),
+      authFirst: s.authFirst, onAuthFirst: (e) => this.setState({ authFirst: e.target.value, authErr: '' }),
+      authLast: s.authLast, onAuthLast: (e) => this.setState({ authLast: e.target.value, authErr: '' }),
+      otp: s.otp, onOtp: (e) => { const v = e.target.value.slice(0, 6); this.setState({ otp: v, authErr: '' }, () => { if (this.deFa(v).length === 6) this.verifyOtp(); }); },
       authErr: s.authErr,
       sendOtp: this.sendOtp, verifyOtp: this.verifyOtp,
       editPhone: () => { clearInterval(this._cd); this.setState({ authStep: 'phone', otp: '', authErr: '', resendIn: 0 }); },
@@ -1451,7 +1802,7 @@ class Component extends DCLogic {
       rfErrPhotos: s.rfErrs.photos || '', rfErrGas: s.rfErrs.gas || '', rfErrDelivery: s.rfErrs.delivery || '',
       rfErrAddr: s.rfErrs.addr || '', rfErrPhone: s.rfErrs.phone || '', rfErrSlot: s.rfErrs.slot || '',
       rfDays: [0, 1, 2, 3].map(off => { const d = this.dayLabel(off); return { key: off, label: d.name, sub: d.date, style: this.dayChipStyle(s.rfDay === off), pick: () => this.setState({ rfDay: off }) }; }),
-      rfSlots: this.SLOTS.map(sl => ({ key: sl[0], label: sl[1], style: this.slotChipStyle(s.rfSlot === sl[0]), pick: () => this.setState({ rfSlot: sl[0], rfErrs: { ...s.rfErrs, slot: '' } }) })),
+      rfSlots: this.SLOTS.map(sl => { const past = this.slotPast(s.rfDay, sl[0]); return { key: sl[0], label: sl[1], style: this.slotChipStyle(s.rfSlot === sl[0] && !past, past), pick: () => { if (!past) this.setState({ rfSlot: s.rfSlot === sl[0] ? '' : sl[0] }); } }; }),
       submitRefill: this.submitRefill,
 
       // used-sale form
@@ -1466,17 +1817,15 @@ class Component extends DCLogic {
       submitUsed: this.submitUsed,
 
       // form success
-      fsTitle: s.fsKind === 'inquiry' ? 'درخواست استعلام قیمت ثبت شد' : s.fsKind === 'refill' ? 'درخواست شارژ ثبت شد' : 'پیشنهاد فروش ثبت شد',
+      fsTitle: s.fsKind === 'refill' ? 'درخواست شارژ ثبت شد' : 'پیشنهاد فروش ثبت شد',
       fsCode: s.fsCode,
       fsDelivery: s.requests[0] ? (s.requests[0].delivery || '') : '',
       fsHasDelivery: !!(s.fsKind === 'refill' && s.requests[0] && s.requests[0].delivery),
-      fsNote: s.fsKind === 'inquiry'
-        ? 'درخواست استعلام شما ثبت شد؛ کارشناسان قیمت روز را بررسی و در اسرع وقت با شما تماس می‌گیرند.'
-        : s.fsKind === 'refill'
+      fsNote: s.fsKind === 'refill'
         ? 'درخواست شما در صف بررسی اپراتور قرار گرفت؛ پس از تخصیص تکنسین، زمان مراجعه پیامک می‌شود.'
         : 'پیشنهاد شما در صف بررسی قرار گرفت؛ نتیجه (پذیرش، رد یا مذاکره) با پیامک اطلاع‌رسانی می‌شود.',
-      fsGoList: () => this.go({ route: s.fsKind === 'inquiry' ? 'inquiries' : 'requests' }),
-      fsListLabel: s.fsKind === 'inquiry' ? 'استعلام‌های من' : 'درخواست‌های من',
+      fsGoList: () => this.go({ route: 'requests' }),
+      fsListLabel: 'درخواست‌های من',
 
       // profile
       userName: s.userName || 'کاربر امداد اکسیژن',
@@ -1486,20 +1835,20 @@ class Component extends DCLogic {
       startEditName: () => this.setState({ editingName: true, nameInput: s.userName }),
       nameInput: s.nameInput, onNameInput: (e) => this.setState({ nameInput: e.target.value }),
       saveName: () => { this.setState({ userName: s.nameInput.trim() || s.userName, editingName: false }); this.toast('نام شما ذخیره شد'); },
-      logout: () => { this.setState({ loggedIn: false, userName: '', phone: '' }); this.toast('از حساب خارج شدید'); },
+      logout: () => { this.dbAuth('logout', s.phone); this.setState({ loggedIn: false, userName: '', phone: '' }); this.toast('از حساب خارج شدید'); },
       menuRows,
 
       // delivery scheduler (P7)
       coDays: [0, 1, 2, 3].map(off => { const d = this.dayLabel(off); return { key: off, label: d.name, sub: d.date, style: this.dayChipStyle(s.coDay === off), pick: () => this.setState({ coDay: off }) }; }),
-      coSlots: this.SLOTS.map(sl => ({ key: sl[0], label: sl[1], style: this.slotChipStyle(s.coSlot === sl[0]), pick: () => this.setState({ coSlot: sl[0] }) })),
+      coSlots: this.SLOTS.map(sl => { const past = this.slotPast(s.coDay, sl[0]); return { key: sl[0], label: sl[1], style: this.slotChipStyle(this.effSlot(s.coDay, s.coSlot) === sl[0], past), pick: () => { if (!past) this.setState({ coSlot: s.coSlot === sl[0] ? '' : sl[0] }); } }; }),
       successDelivery: s.orders[0] ? (s.orders[0].delivery || '') : '',
 
-      ordersList: s.orders.map(o => ({ no: o.no, date: o.date, countLabel: this.fmt(o.count), totalLabel: this.fmt(o.total), delivery: o.delivery || 'هماهنگی تلفنی', open: () => this.go({ route: 'orderDetail', odId: o.no, odFresh: false }), ...this.stepperVM('order', o.ts) })),
+      ordersList: s.orders.map(o => ({ no: o.no, date: o.date, countLabel: this.fmt(o.count), totalLabel: this.fmt(o.total), delivery: o.delivery || 'هماهنگی تلفنی', open: () => this.go({ route: 'orderDetail', odId: o.no, odFresh: false }), ...this.stepperVM('order', o) })),
       ordersEmpty: s.orders.length === 0,
       requestsList: s.requests.map(r => ({
-        kindLabel: r.kind === 'refill' ? 'شارژ کپسول گاز' : 'فروش دست دوم',
+        kindLabel: r.kind === 'refill' ? 'شارژ کپسول گاز' : 'فروش تجهیزات',
         code: r.code, date: r.date, delivery: r.delivery || '', showDelivery: !!(r.kind === 'refill' && r.delivery),
-        open: () => this.go({ route: 'requestDetail', rqCode: r.code }), ...this.stepperVM(r.kind, r.ts)
+        open: () => this.go({ route: 'requestDetail', rqCode: r.code }), ...this.stepperVM(r.kind, r)
       })),
       // Epic 3+5 / 4: detail view-models (od*/rd*) + route flags. Computed every render (cheap); the
       // od*/rd* keys are only consumed by the orderDetail / requestDetail screens.
@@ -1508,14 +1857,29 @@ class Component extends DCLogic {
       isRequestDetail: route === 'requestDetail',
       ...this.requestVM(s.requests.find(r => r.code === s.rqCode)),
       requestsEmpty: s.requests.length === 0,
-      inquiriesList: s.inquiries.map(iq => ({ title: iq.title, code: iq.code, date: iq.date, ...this.stepperVM('inquiry', iq.ts) })),
-      inquiriesEmpty: s.inquiries.length === 0,
       addrCards,
       wishItems: wishIds.map(id => this.vm(this.PRODUCTS.find(p => p.id === id))).filter(Boolean),
       wishEmpty: wishIds.length === 0,
 
       toastShow: s.toastShow, toastMsg: s.toastMsg,
-      fabStyle,
+      fabStyle, toastWrapStyle,
+      ...(() => {
+        const sv = this.SERVICES || this.DEFAULT_SERVICES, get = (id) => sv.find(x => x.id === id) || this.DEFAULT_SERVICES.find(x => x.id === id);
+        const r = get('refill'), u = get('used');
+        return {
+          svcRefillOn: r.active !== false, svcRefillTitle: r.title, svcRefillSub: r.subtitle || '',
+          svcUsedOn: u.active !== false, svcUsedTitle: u.title, svcUsedSub: u.subtitle || '',
+          extraServices: sv.filter(x => !x.builtIn && x.active !== false && x.id !== 'refill' && x.id !== 'used')
+            .map(x => ({ id: x.id, title: x.title, sub: x.subtitle || x.desc || '', open: () => { this.dbLog('service.interest', { service: x.id }); this.setState({ contactOpen: true }); } })),
+        };
+      })(),
+      contactOpen: s.contactOpen, openContact: () => this.setState({ contactOpen: true }), closeContact: () => this.setState({ contactOpen: false }),
+      contactAddress: this.CONTACT.address, contactHours: this.CONTACT.hours, contactPhoneLabel: this.CONTACT.phoneLabel,
+      contactTelHref: 'tel:' + this.CONTACT.tel, contactCallLabel: 'تماس با ' + this.CONTACT.phoneLabel,
+      contactMapUrl: 'https://www.google.com/maps/search/?api=1&query=' + encodeURIComponent(this.CONTACT.mapQuery),
+      rfTimeOpen: s.rfTimeOpen, openRfTime: () => this.setState({ rfTimeOpen: true }), closeRfTime: () => this.setState({ rfTimeOpen: false }),
+      clearRfTime: () => this.setState({ rfSlot: '', rfDay: 0, rfTimeOpen: false }),
+      rfTimeLabel: this.effSlot(s.rfDay, s.rfSlot) ? this.deliveryLabel(s.rfDay, s.rfSlot) : 'انتخاب زمان — یا هماهنگی تلفنی',
       navPillStyle,
       navs
     };

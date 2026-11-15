@@ -1,0 +1,575 @@
+<!DOCTYPE html>
+<html lang="fa" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>پنل مدیریت امداد اکسیژن</title>
+<style>
+/*__VAZIR_FONTS__*/
+/* Layout: sidebar (start side, RTL) + content column; collapses to a scrolling tab strip on phones.
+   Tokens mirror the shop app (purple tint, teal accent, iOS-style neutrals). */
+:root{
+  --bg:#f2f2f7; --sur:#ffffff; --sur2:#f6f5fb; --fill:rgba(118,118,128,.12);
+  --tx:#1c1c1e; --tx2:#636366; --line:rgba(60,60,67,.14);
+  --p:#6250a8; --p-deep:#4c3d86; --p-soft:#ece8f8; --p-ink:#5a48a0;
+  --acc:#1aa8bd; --acc-soft:#dcf2f5; --acc-ink:#0b6b79;
+  --ok:#1e7a37; --ok-soft:#e1f5e6; --warn:#8a5300; --warn-soft:#fdf0d9; --err:#c4001a; --err-soft:#fde4e6;
+  --shadow:0 1px 2px rgba(0,0,0,.04),0 8px 24px -14px rgba(40,30,90,.25);
+  --r:16px; --font:Vazir,Vazirmatn,system-ui,-apple-system,"Segoe UI",Tahoma,sans-serif;
+  color-scheme:light;
+}
+@media (prefers-color-scheme:dark){:root{
+  --bg:#0b0a12; --sur:#1a1826; --sur2:#211e30; --fill:rgba(118,118,128,.24);
+  --tx:#f5f5f7; --tx2:#a1a1a8; --line:rgba(255,255,255,.10);
+  --p:#a493ee; --p-deep:#6b58be; --p-soft:#2c2650; --p-ink:#c3b8f5;
+  --acc:#41d0e2; --acc-soft:#123540; --acc-ink:#7fe3f0;
+  --ok:#30d158; --ok-soft:#0f2e1a; --warn:#ffb340; --warn-soft:#3a2a10; --err:#ff6961; --err-soft:#3a1716;
+  --shadow:0 1px 2px rgba(0,0,0,.4),0 10px 28px -14px rgba(0,0,0,.8); color-scheme:dark;
+}}
+*{box-sizing:border-box}
+html,body{margin:0;background:var(--bg);color:var(--tx);font:14px/1.7 var(--font)}
+button,input,select,textarea{font:inherit;color:inherit}
+a{color:var(--p-ink)}
+:focus-visible{outline:2px solid var(--p);outline-offset:2px;border-radius:8px}
+.num{font-variant-numeric:tabular-nums}
+.ltr{direction:ltr;unicode-bidi:isolate;display:inline-block}
+
+/* ---- shell ---- */
+.shell{display:grid;grid-template-columns:240px minmax(0,1fr);min-height:100vh}
+.side{position:sticky;top:0;height:100vh;background:var(--sur);border-inline-end:1px solid var(--line);padding:18px 14px;display:flex;flex-direction:column;gap:4px}
+.brand{display:flex;align-items:center;gap:10px;padding:4px 8px 16px}
+.logo{width:40px;height:40px;border-radius:12px;background:linear-gradient(140deg,var(--p-deep),var(--p) 60%,var(--acc) 140%);color:#fff;display:grid;place-items:center;font-weight:700}
+.brand b{display:block;font-size:15px;white-space:nowrap} .brand small{color:var(--tx2);font-size:12px}
+.nav a{display:flex;align-items:center;gap:10px;padding:9px 12px;border-radius:12px;text-decoration:none;color:var(--tx);font-weight:500}
+.nav a:hover{background:var(--sur2)}
+.nav a[aria-current="page"]{background:var(--p-soft);color:var(--p-ink);font-weight:700}
+.nav .count{margin-inline-start:auto;background:var(--err);color:#fff;border-radius:999px;font-size:11px;min-width:20px;height:20px;display:grid;place-items:center;padding:0 6px}
+.side .foot{margin-top:auto;display:flex;flex-direction:column;gap:8px;font-size:12px;color:var(--tx2)}
+.main{min-width:0;padding:22px clamp(16px,3vw,32px) 48px}
+.top{display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:18px}
+.top h1{margin:0;font-size:22px;font-weight:700;flex:1;min-width:180px}
+.src{display:inline-flex;align-items:center;gap:6px;font-size:12px;padding:5px 12px;border-radius:999px;background:var(--sur);border:1px solid var(--line)}
+.src i{width:8px;height:8px;border-radius:999px;background:var(--warn)} .src.on i{background:var(--ok)}
+
+/* ---- components ---- */
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:6px;height:38px;padding:0 16px;border-radius:999px;border:1px solid var(--line);background:var(--sur);cursor:pointer;font-weight:600;text-decoration:none;color:var(--tx);white-space:nowrap}
+.btn:hover{border-color:var(--p)}
+.btn.pri{background:var(--p-deep);border-color:transparent;color:#fff}
+.btn.dan{color:var(--err);border-color:color-mix(in oklab,var(--err) 40%,var(--line))}
+.btn.sm{height:32px;padding:0 12px;font-size:13px}
+.card{background:var(--sur);border:1px solid var(--line);border-radius:var(--r);box-shadow:var(--shadow)}
+.pad{padding:16px 18px}
+.grid{display:grid;gap:14px}
+.kpis{grid-template-columns:repeat(auto-fit,minmax(170px,1fr))}
+.kpi{padding:16px 18px}
+.kpi .l{font-size:12.5px;color:var(--tx2)} .kpi .v{font-size:24px;font-weight:700;margin-top:2px}
+.kpi .s{font-size:12px;color:var(--tx2)}
+.kpi.alert{border-color:color-mix(in oklab,var(--warn) 45%,var(--line))}
+.two{grid-template-columns:minmax(0,1fr) minmax(0,1fr)}
+.sec-h{display:flex;align-items:center;justify-content:space-between;gap:10px;margin:0 0 10px}
+.sec-h h2{margin:0;font-size:16px;font-weight:700}
+.tools{display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-bottom:12px}
+.search{flex:1;min-width:200px;height:40px;border-radius:12px;border:1px solid transparent;background:var(--fill);padding:0 14px}
+.chips{display:flex;gap:6px;flex-wrap:wrap}
+.chip{height:32px;padding:0 12px;border-radius:999px;border:1px solid var(--line);background:var(--sur);cursor:pointer;font-size:13px}
+.chip[aria-pressed="true"]{background:var(--p-soft);border-color:var(--p);color:var(--p-ink);font-weight:700}
+.tbl{overflow-x:auto}
+table{width:100%;border-collapse:collapse;font-size:13.5px}
+th{font-weight:600;color:var(--tx2);font-size:12px;text-align:start;padding:10px 12px;border-bottom:1px solid var(--line);white-space:nowrap}
+td{padding:11px 12px;border-bottom:1px solid var(--line);vertical-align:middle;white-space:nowrap}
+tr:last-child td{border-bottom:none}
+tbody tr.click{cursor:pointer} tbody tr.click:hover{background:var(--sur2)}
+.badge{display:inline-flex;align-items:center;gap:4px;font-size:12px;font-weight:600;padding:3px 10px;border-radius:999px;background:var(--p-soft);color:var(--p-ink)}
+.badge.ok{background:var(--ok-soft);color:var(--ok)} .badge.warn{background:var(--warn-soft);color:var(--warn)}
+.badge.err{background:var(--err-soft);color:var(--err)} .badge.acc{background:var(--acc-soft);color:var(--acc-ink)} .badge.mute{background:var(--fill);color:var(--tx2)}
+.empty{padding:28px;text-align:center;color:var(--tx2)}
+.muted{color:var(--tx2)} .small{font-size:12px}
+.feed{list-style:none;margin:0;padding:0}
+.feed li{display:flex;gap:10px;padding:9px 0;border-bottom:1px solid var(--line);font-size:13px}
+.feed li:last-child{border-bottom:none}
+.feed time{margin-inline-start:auto;color:var(--tx2);font-size:12px;white-space:nowrap}
+.prod-cell{display:flex;align-items:center;gap:10px}
+.dot{width:10px;height:10px;border-radius:999px;flex:none}
+
+/* ---- drawer & modal ---- */
+.scrim{position:fixed;inset:0;background:rgba(15,12,40,.45);z-index:50}
+.drawer{position:fixed;top:0;bottom:0;inset-inline-end:0;width:min(520px,100%);background:var(--sur);z-index:51;overflow-y:auto;padding:20px 22px 28px;box-shadow:0 0 40px rgba(0,0,0,.25)}
+.modal{position:fixed;inset:0;z-index:51;display:grid;place-items:center;padding:16px}
+.modal > .card{width:min(640px,100%);max-height:calc(100vh - 32px);overflow-y:auto;padding:20px 22px}
+.d-h{display:flex;align-items:center;gap:10px;margin-bottom:14px}
+.d-h h2{margin:0;font-size:18px;flex:1}
+.x{width:36px;height:36px;border-radius:999px;border:1px solid var(--line);background:var(--sur);cursor:pointer;font-size:18px;line-height:1}
+.kv{display:grid;grid-template-columns:auto minmax(0,1fr);gap:6px 16px;font-size:13.5px;margin:0 0 14px}
+.kv dt{color:var(--tx2)} .kv dd{margin:0;min-width:0;overflow-wrap:anywhere}
+.box{background:var(--sur2);border-radius:12px;padding:12px 14px;margin-bottom:14px}
+.steps{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px}
+.form{display:grid;grid-template-columns:1fr 1fr;gap:12px 14px}
+.form .full{grid-column:1/-1}
+.form label{display:flex;flex-direction:column;gap:6px;font-size:13px;font-weight:600}
+.form input[type=text],.form input[type=number],.form select,.form textarea,.field{height:42px;border-radius:12px;border:1px solid transparent;background:var(--fill);padding:0 12px;font-weight:400}
+.form textarea{height:auto;min-height:84px;padding:10px 12px;resize:vertical}
+.check{flex-direction:row!important;align-items:center;gap:8px!important;font-weight:500!important}
+.err-msg{color:var(--err);font-size:13px;min-height:20px}
+.actions{display:flex;gap:10px;justify-content:flex-end;flex-wrap:wrap;margin-top:14px}
+.toast{position:fixed;bottom:20px;inset-inline-start:50%;transform:translateX(50%);background:var(--tx);color:var(--bg);padding:10px 18px;border-radius:999px;z-index:60;font-size:13.5px;box-shadow:var(--shadow)}
+
+/* ---- login ---- */
+.login{min-height:100vh;display:grid;place-items:center;padding:16px}
+.login .card{width:min(380px,100%);padding:26px 24px;text-align:center}
+.login input{width:100%;height:46px;border-radius:12px;border:1px solid transparent;background:var(--fill);padding:0 14px;margin:14px 0 6px;text-align:center}
+.hint{font-size:12px;color:var(--tx2);background:var(--warn-soft);border-radius:10px;padding:8px 12px;margin-top:12px}
+
+@media (max-width:860px){
+  .shell{grid-template-columns:minmax(0,1fr)}
+  .side{position:sticky;top:0;z-index:20;height:auto;flex-direction:row;align-items:center;padding:10px 12px;border-inline-end:none;border-bottom:1px solid var(--line);overflow-x:auto}
+  .brand{padding:0 0 0 8px} .brand small,.side .foot{display:none}
+  .nav{display:flex;gap:4px} .nav a{white-space:nowrap;padding:7px 12px}
+  .two,.form{grid-template-columns:minmax(0,1fr)}
+}
+@media (prefers-reduced-motion:no-preference){.drawer{animation:dIn .22s ease-out}@keyframes dIn{from{transform:translateX(-30px);opacity:0}}}
+</style>
+</head>
+<body>
+<div id="app"></div>
+<script>
+'use strict';
+/* =====================================================================================
+   Emdad Oxygen — administration dashboard
+   Data: the same database as the shop app.
+     · With server.js running (npm start): reads/writes db.json through /api.
+     · Otherwise (GitHub Pages / file://): the browser copy the app keeps (localStorage
+       "emdad:db"), shared by the app and this page on the same site — changes here reach
+       the app immediately (and vice versa).
+   Sign-in is a client-side demo gate, NOT real security; a production admin needs
+   server-side authentication.
+   ===================================================================================== */
+const API = '/api', LOCAL = 'emdad:db', ADMIN_PASS = 'emdad-admin';
+const COLS = ['users','sessions','carts','wishlists','addressBooks','orders','payments','serviceRequests','products','services','activity'];
+const CATS = { cyl: 'کپسول طبی', dev: 'دستگاه‌ها', acc: 'لوازم جانبی' };
+const ARTS = { cyl: 'کپسول', dev: 'دستگاه', mano: 'مانومتر', mask: 'ماسک' };
+const STAGES = {
+  order:  ['ثبت سفارش', 'در حال آماده‌سازی', 'ارسال شد', 'تحویل شد'],
+  refill: ['ثبت درخواست', 'جمع‌آوری کپسول', 'در حال شارژ', 'تحویل شد'],
+  used:   ['ثبت درخواست', 'در حال بررسی', 'قیمت‌گذاری', 'تکمیل شد'],
+};
+const KIND = { refill: 'شارژ کپسول', used: 'تجهیزات' };
+const ACT = { 'auth.signup': 'ثبت‌نام', 'auth.login': 'ورود', 'auth.logout': 'خروج', 'auth.otp_requested': 'درخواست کد ورود',
+  'cart.update': 'تغییر سبد', 'wishlist.update': 'تغییر علاقه‌مندی', 'address.update': 'تغییر آدرس', 'order.place': 'ثبت سفارش',
+  'payment.start': 'شروع پرداخت', 'payment.success': 'پرداخت موفق', 'payment.cancel': 'لغو پرداخت', 'payment.error': 'خطای پرداخت',
+  'service.request': 'درخواست خدمت', 'service.interest': 'علاقه به خدمت', 'profile.rename': 'تغییر نام', 'settings.theme': 'تغییر تم',
+  'catalog.search': 'جستجو', 'catalog.filter': 'فیلتر دسته', 'admin': 'اقدام مدیر' };
+
+let DB = null, ONLINE = false, VIEW = 'overview', UI = { q: '', f: 'all' }, OVERLAY = null, POLL = null;
+
+// ---------- helpers ----------
+const $ = (s, r = document) => r.querySelector(s);
+const esc = (v) => String(v ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+const fa = (n) => Number(n || 0).toLocaleString('fa-IR');
+const faD = (s) => String(s ?? '').replace(/\d/g, d => '۰۱۲۳۴۵۶۷۸۹'[d]);
+const toman = (n) => fa(n) + ' تومان';
+const when = (r) => { const t = r && (r.at || r.createdAt || (r.ts && new Date(r.ts).toISOString())); if (!t) return '—';
+  try { return new Date(t).toLocaleString('fa-IR', { dateStyle: 'medium', timeStyle: 'short' }); } catch (e) { return t; } };
+const stamp = (r) => +new Date(r.at || r.createdAt || r.ts || 0);
+const newest = (a) => a.slice().sort((x, y) => stamp(y) - stamp(x));
+function toast(msg) { const el = document.createElement('div'); el.className = 'toast'; el.setAttribute('role', 'status'); el.textContent = msg; document.body.appendChild(el); setTimeout(() => el.remove(), 2600); }
+
+// ---------- data layer ----------
+function ensure(db) { db = db && typeof db === 'object' ? db : {}; db.meta = db.meta || { app: 'emdad-oxygen-shop', schema: 1 }; COLS.forEach(c => { if (!Array.isArray(db[c])) db[c] = []; }); return db; }
+function readMirror() { try { return ensure(JSON.parse(localStorage.getItem(LOCAL))); } catch (e) { return ensure(null); } }
+function writeMirror(db) { try { localStorage.setItem(LOCAL, JSON.stringify(db)); } catch (e) { toast('ذخیره در مرورگر ممکن نشد'); } }
+async function probe() {
+  if (!/^https?:$/.test(location.protocol) || /\.github\.io$/.test(location.hostname)) return false;
+  try { const r = await fetch(API + '/health', { cache: 'no-store' }); return r.ok && !!(await r.json()).ok; } catch (e) { return false; }
+}
+async function load() {
+  if (ONLINE) { try { DB = ensure(await (await fetch(API + '/db', { cache: 'no-store' })).json()); return; } catch (e) { ONLINE = false; } }
+  DB = readMirror();
+  if (!DB.products.length || !DB.services.length) {           // first visit: seed the catalogue from the published db.json
+    try { const seed = await (await fetch('db.json', { cache: 'no-store' })).json();
+      if (!DB.products.length) DB.products = seed.products || [];
+      if (!DB.services.length) DB.services = seed.services || [];
+      writeMirror(DB); } catch (e) {}
+  }
+}
+function applyLocal(db, method, col, id, body) {
+  const list = db[col], now = new Date().toISOString(), idx = id == null ? -1 : list.findIndex(r => String(r.id) === String(id));
+  if (method === 'POST') list.push({ id: body.id || ('r_' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6)), createdAt: now, ...body });
+  else if (method === 'DELETE') { if (idx >= 0) list.splice(idx, 1); }
+  else { const base = idx < 0 ? { id, createdAt: now } : (method === 'PATCH' ? list[idx] : { id, createdAt: list[idx].createdAt });
+    const rec = { ...base, ...body, id, updatedAt: now }; if (idx < 0) list.push(rec); else list[idx] = rec; }
+  db.meta.updatedAt = now;
+}
+async function write(method, col, id, body) {
+  if (ONLINE) {
+    const url = API + '/' + col + (id != null ? '/' + encodeURIComponent(id) : '');
+    const r = await fetch(url, { method, headers: { 'Content-Type': 'application/json' }, body: method === 'DELETE' ? undefined : JSON.stringify(body || {}) }).catch(() => null);
+    if (!r || !r.ok) { toast('ذخیره روی سرور انجام نشد'); return false; }
+    applyLocal(DB, method, col, id, body || {});
+  } else {
+    const m = readMirror(); applyLocal(m, method, col, id, body || {}); writeMirror(m); DB = m;   // re-read first: never clobber the app's writes
+  }
+  return true;
+}
+const logAdmin = (what, data) => write('POST', 'activity', null, { type: 'admin', at: new Date().toISOString(), userId: 'admin', data: { what, ...data } });
+
+// ---------- derived ----------
+const isOpen = (r) => r.status !== 'cancelled' && (+r.stage || 1) < 4;
+function stageBadge(kind, r) {
+  if (r.status === 'cancelled') return '<span class="badge err">لغو شد</span>';
+  const st = +r.stage || 1, name = (STAGES[kind] || STAGES.order)[st - 1];
+  return '<span class="badge ' + (st >= 4 ? 'ok' : st === 1 ? 'warn' : '') + '">' + esc(name) + '</span>';
+}
+const userOf = (id) => DB.users.find(u => u.id === id);
+const custName = (r) => r.customer || (userOf(r.userId) || {}).name || '—';
+const lowStock = () => DB.products.filter(p => p.active !== false && (+p.stock || 0) <= 3);
+
+// ---------- render ----------
+const NAV = [
+  ['overview', 'نمای کلی', 'M3 12l9-9 9 9M5 10v10h14V10'],
+  ['orders', 'سفارش‌ها', 'M4 7h16l-1.5 13h-13L4 7zM8 7a4 4 0 0 1 8 0'],
+  ['requests', 'درخواست‌های خدمت', 'M9 3h6M12 3v4M8 7h8v13a1 1 0 0 1-1 1H9a1 1 0 0 1-1-1z'],
+  ['payments', 'پرداخت‌ها', 'M3 6h18v13H3zM3 10h18'],
+  ['products', 'محصولات', 'M4 4h7v7H4zM13 4h7v7h-7zM4 13h7v7H4zM13 13h7v7h-7z'],
+  ['services', 'خدمات', 'M12 3a9 9 0 1 0 0 18 9 9 0 0 0 0-18M12 8v8M8 12h8'],
+  ['customers', 'مشتریان', 'M12 12a4 4 0 1 0 0-8 4 4 0 0 0 0 8zM5 21a7 7 0 0 1 14 0'],
+  ['activity', 'گزارش فعالیت', 'M3 12h4l3 8 4-16 3 8h4'],
+  ['data', 'داده و تنظیمات', 'M4 6c0-1.7 3.6-3 8-3s8 1.3 8 3-3.6 3-8 3-8-1.3-8-3zM4 6v12c0 1.7 3.6 3 8 3s8-1.3 8-3V6M4 12c0 1.7 3.6 3 8 3s8-1.3 8-3'],
+];
+const icon = (d) => '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="' + d + '"></path></svg>';
+
+function shell(title, actions, body) {
+  const openOrders = DB.orders.filter(isOpen).length, openReq = DB.serviceRequests.filter(isOpen).length;
+  const badge = { orders: openOrders, requests: openReq };
+  return '<div class="shell"><aside class="side" aria-label="بخش‌ها"><div class="brand"><div class="logo">O₂</div><div><b>امداد اکسیژن</b><small>پنل مدیریت</small></div></div>'
+    + '<nav class="nav">' + NAV.map(([k, l, d]) => '<a href="#' + k + '"' + (VIEW === k ? ' aria-current="page"' : '') + '>' + icon(d) + '<span>' + l + '</span>'
+      + (badge[k] ? '<span class="count num">' + fa(badge[k]) + '</span>' : '') + '</a>').join('') + '</nav>'
+    + '<div class="foot"><a class="btn sm" href="./" target="_blank" rel="noopener">باز کردن اپلیکیشن ↗</a><button class="btn sm" data-a="logout">خروج از پنل</button></div></aside>'
+    + '<main class="main"><div class="top"><h1>' + title + '</h1>' + actions
+    + '<span class="src' + (ONLINE ? ' on' : '') + '" title="' + (ONLINE ? 'سرور محلی: db.json' : 'داده‌های همین مرورگر (مشترک با اپ)') + '"><i></i>' + (ONLINE ? 'متصل به db.json' : 'حالت مرورگر') + '</span>'
+    + '<button class="btn sm" data-a="refresh">به‌روزرسانی</button></div>' + body + '</main></div>';
+}
+function table(cols, rows, click) {
+  if (!rows.length) return '<div class="empty">موردی یافت نشد</div>';
+  return '<div class="tbl"><table><thead><tr>' + cols.map(c => '<th scope="col">' + c + '</th>').join('') + '</tr></thead><tbody>'
+    + rows.map(r => '<tr' + (click ? ' class="click" tabindex="0" data-a="' + click + '" data-id="' + esc(r.id) + '"' : '') + '>' + r.cells.map(c => '<td>' + c + '</td>').join('') + '</tr>').join('')
+    + '</tbody></table></div>';
+}
+function filterBar(chips) {
+  return '<div class="tools"><input class="search" type="search" id="q" placeholder="جستجو: شماره، نام یا تلفن…" aria-label="جستجو" value="' + esc(UI.q) + '">'
+    + '<div class="chips" role="group" aria-label="فیلتر">' + chips.map(([k, l]) => '<button class="chip" data-a="filter" data-f="' + k + '" aria-pressed="' + (UI.f === k) + '">' + l + '</button>').join('') + '</div></div>';
+}
+const match = (r, keys) => !UI.q || keys.some(k => String(k ?? '').toLowerCase().includes(UI.q.toLowerCase()) || faD(k).includes(UI.q));
+
+const V = {};
+V.overview = () => {
+  const paid = DB.payments.filter(p => p.status === 'paid'), revenue = paid.reduce((a, p) => a + (+p.amount || 0), 0);
+  const today = new Date().toDateString(), todayAct = DB.activity.filter(a => new Date(a.at || a.createdAt).toDateString() === today).length;
+  const low = lowStock();
+  const k = (l, v, s, cls) => '<div class="card kpi' + (cls ? ' ' + cls : '') + '"><div class="l">' + l + '</div><div class="v num">' + v + '</div><div class="s">' + s + '</div></div>';
+  const recentO = newest(DB.orders).slice(0, 6).map(o => ({ id: o.id, cells: ['<span class="ltr num">' + esc(o.id) + '</span>', esc(custName(o)), '<span class="num">' + toman(o.total) + '</span>', stageBadge('order', o)] }));
+  const recentR = newest(DB.serviceRequests).slice(0, 6).map(r => ({ id: r.id, cells: ['<span class="ltr num">' + esc(r.id) + '</span>', esc(KIND[r.kind] || r.kind), esc(custName(r)), stageBadge(r.kind, r)] }));
+  return shell('نمای کلی', '', '<div class="grid kpis">'
+      + k('درآمد پرداخت‌شده', fa(revenue), 'تومان · ' + fa(paid.length) + ' پرداخت')
+      + k('سفارش‌ها', fa(DB.orders.length), fa(DB.orders.filter(isOpen).length) + ' در جریان')
+      + k('درخواست‌های خدمت', fa(DB.serviceRequests.length), fa(DB.serviceRequests.filter(isOpen).length) + ' باز')
+      + k('مشتریان', fa(DB.users.length), fa(DB.sessions.filter(s => s.type === 'login' || s.type === 'signup').length) + ' ورود ثبت‌شده')
+      + k('کم‌موجودی', fa(low.length), low.length ? low.map(p => esc(p.title)).slice(0, 2).join('، ') : 'همه محصولات موجودند', low.length ? 'alert' : '')
+      + k('فعالیت امروز', fa(todayAct), 'رویداد ثبت‌شده')
+    + '</div><div class="grid two" style="margin-top:14px">'
+    + '<section class="card pad"><div class="sec-h"><h2>آخرین سفارش‌ها</h2><a href="#orders">همه</a></div>' + table(['شماره', 'مشتری', 'مبلغ', 'وضعیت'], recentO, 'order') + '</section>'
+    + '<section class="card pad"><div class="sec-h"><h2>آخرین درخواست‌ها</h2><a href="#requests">همه</a></div>' + table(['کد', 'نوع', 'مشتری', 'وضعیت'], recentR, 'request') + '</section>'
+    + '</div><section class="card pad" style="margin-top:14px"><div class="sec-h"><h2>آخرین فعالیت‌ها</h2><a href="#activity">گزارش کامل</a></div>' + feed(newest(DB.activity).slice(0, 8)) + '</section>');
+};
+function feed(list) {
+  if (!list.length) return '<div class="empty">هنوز فعالیتی ثبت نشده است</div>';
+  return '<ul class="feed">' + list.map(a => {
+    const d = a.data || {}, who = a.userId === 'admin' ? 'مدیر' : (userOf(a.userId) || {}).name || (a.userId ? a.userId : 'مهمان');
+    const extra = d.what ? esc(d.what) : d.no ? '<span class="ltr">' + esc(d.no) + '</span>' : d.code ? '<span class="ltr">' + esc(d.code) + '</span>' : d.q ? '«' + esc(d.q) + '»' : d.orderNo ? '<span class="ltr">' + esc(d.orderNo) + '</span>' : '';
+    return '<li><span class="badge mute">' + esc(ACT[a.type] || a.type) + '</span><span>' + esc(who) + (extra ? ' · ' + extra : '') + '</span><time>' + when(a) + '</time></li>';
+  }).join('') + '</ul>';
+}
+V.orders = () => {
+  const rows = newest(DB.orders).filter(o => (UI.f === 'all' || (UI.f === 'open' ? isOpen(o) : UI.f === 'done' ? (+o.stage === 4 && o.status !== 'cancelled') : o.status === 'cancelled'))
+      && match(o, [o.id, custName(o), o.phone]))
+    .map(o => ({ id: o.id, cells: ['<span class="ltr num">' + esc(o.id) + '</span>', esc(custName(o)), '<span class="ltr num">' + esc(o.phone || '—') + '</span>', when(o), '<span class="num">' + toman(o.total) + '</span>',
+      o.paid ? '<span class="badge ok">پرداخت‌شده</span>' : '<span class="badge warn">پرداخت‌نشده</span>', stageBadge('order', o)] }));
+  return shell('سفارش‌ها', '', filterBar([['all', 'همه'], ['open', 'در جریان'], ['done', 'تحویل‌شده'], ['cancelled', 'لغوشده']])
+    + '<section class="card pad">' + table(['شماره', 'مشتری', 'تلفن', 'زمان', 'مبلغ', 'پرداخت', 'وضعیت'], rows, 'order') + '</section>');
+};
+V.requests = () => {
+  const rows = newest(DB.serviceRequests).filter(r => (UI.f === 'all' || UI.f === r.kind || (UI.f === 'open' && isOpen(r))) && match(r, [r.id, custName(r), r.phone]))
+    .map(r => ({ id: r.id, cells: ['<span class="ltr num">' + esc(r.id) + '</span>', '<span class="badge ' + (r.kind === 'refill' ? 'acc' : '') + '">' + esc(KIND[r.kind] || r.kind) + '</span>', esc(custName(r)), when(r), esc(r.delivery || '—'), stageBadge(r.kind, r)] }));
+  return shell('درخواست‌های خدمت', '', filterBar([['all', 'همه'], ['open', 'باز'], ['refill', 'شارژ کپسول'], ['used', 'تجهیزات']])
+    + '<section class="card pad">' + table(['کد', 'نوع', 'مشتری', 'زمان', 'زمان تحویل', 'وضعیت'], rows, 'request') + '</section>');
+};
+V.payments = () => {
+  const list = newest(DB.payments).filter(p => match(p, [p.id, p.orderNo, custName(p)]));
+  const total = list.filter(p => p.status === 'paid').reduce((a, p) => a + (+p.amount || 0), 0);
+  const rows = list.map(p => ({ id: p.orderNo, cells: ['<span class="ltr num">' + esc(p.id) + '</span>', '<span class="ltr num">' + esc(p.orderNo) + '</span>', esc(custName(p)), '<span class="num">' + toman(p.amount) + '</span>', '<span class="ltr num">' + esc(p.cardMasked || '—') + '</span>', when(p), '<span class="badge ok">موفق</span>'] }));
+  return shell('پرداخت‌ها', '', '<div class="tools"><input class="search" type="search" id="q" placeholder="جستجو: کد پیگیری یا شماره سفارش…" aria-label="جستجو" value="' + esc(UI.q) + '"><span class="badge ok num">جمع: ' + toman(total) + '</span></div>'
+    + '<section class="card pad">' + table(['کد پیگیری', 'سفارش', 'مشتری', 'مبلغ', 'کارت', 'زمان', 'وضعیت'], rows, 'order') + '<p class="small muted">فقط شمارهٔ کارت پوشانده‌شده ذخیره می‌شود؛ شمارهٔ کامل، CVV2 و رمز پویا هرگز ذخیره نمی‌شوند.</p></section>');
+};
+V.products = () => {
+  const rows = DB.products.slice().sort((a, b) => (+a.sort || 999) - (+b.sort || 999)).filter(p => match(p, [p.title, p.id]))
+    .map(p => ({ id: p.id, cells: ['<span class="prod-cell"><span class="dot" style="background:' + (p.active === false ? 'var(--line)' : 'var(--ok)') + '"></span><b>' + esc(p.title) + '</b>' + (p.isNew ? ' <span class="badge acc">جدید</span>' : '') + '</span>',
+      esc(CATS[p.cat] || p.cat), '<span class="num">' + toman(p.price) + '</span>', '<span class="num">' + ((+p.stock || 0) <= 0 ? '<span class="badge err">ناموجود</span>' : (+p.stock <= 3 ? '<span class="badge warn">' + fa(p.stock) + '</span>' : fa(p.stock))) + '</span>',
+      p.active === false ? '<span class="badge mute">پنهان</span>' : '<span class="badge ok">فعال</span>'] }));
+  return shell('محصولات', '<button class="btn pri" data-a="product-new">+ افزودن محصول</button>',
+    '<div class="tools"><input class="search" type="search" id="q" placeholder="جستجوی محصول…" aria-label="جستجوی محصول" value="' + esc(UI.q) + '"></div>'
+    + '<section class="card pad">' + table(['محصول', 'دسته', 'قیمت', 'موجودی', 'نمایش در اپ'], rows, 'product') + '</section>');
+};
+V.services = () => {
+  const rows = DB.services.slice().sort((a, b) => (+a.sort || 999) - (+b.sort || 999))
+    .map(v => ({ id: v.id, cells: ['<b>' + esc(v.title) + '</b>', esc(v.subtitle || ''), v.builtIn ? '<span class="badge acc">فرم اختصاصی</span>' : '<span class="badge">از طریق تماس</span>', v.active === false ? '<span class="badge mute">پنهان</span>' : '<span class="badge ok">فعال</span>'] }));
+  return shell('خدمات', '<button class="btn pri" data-a="service-new">+ افزودن خدمت</button>',
+    '<section class="card pad">' + table(['خدمت', 'توضیح کوتاه', 'نوع ثبت', 'نمایش در اپ'], rows, 'service')
+    + '<p class="small muted">دو خدمت اصلی فرم ثبت درخواست دارند. خدمات جدید در صفحهٔ «خدمات» اپ نمایش داده می‌شوند و با لمس، پنجرهٔ تماس با کارشناس باز می‌شود.</p></section>');
+};
+V.customers = () => {
+  const rows = newest(DB.users.map(u => ({ ...u, at: u.lastLoginAt || u.createdAt }))).filter(u => match(u, [u.name, u.phone, u.id])).map(u => {
+    const os = DB.orders.filter(o => o.userId === u.id), spent = os.filter(o => o.paid).reduce((a, o) => a + (+o.total || 0), 0);
+    return { id: u.id, cells: ['<b>' + esc(u.name || ((u.firstName || '') + ' ' + (u.lastName || '')).trim() || '—') + '</b>', '<span class="ltr num">' + esc(u.phone) + '</span>', '<span class="num">' + fa(u.loginCount || 0) + '</span>', when({ at: u.lastLoginAt }), '<span class="num">' + fa(os.length) + '</span>', '<span class="num">' + toman(spent) + '</span>',
+      '<span class="num">' + fa(DB.serviceRequests.filter(r => r.userId === u.id).length) + '</span>'] };
+  });
+  return shell('مشتریان', '', '<div class="tools"><input class="search" type="search" id="q" placeholder="جستجو: نام یا تلفن…" aria-label="جستجوی مشتری" value="' + esc(UI.q) + '"></div>'
+    + '<section class="card pad">' + table(['نام', 'تلفن', 'تعداد ورود', 'آخرین ورود', 'سفارش‌ها', 'خرید', 'درخواست‌ها'], rows, 'customer') + '</section>');
+};
+V.activity = () => {
+  const groups = [['all', 'همه'], ['auth', 'ورود و ثبت‌نام'], ['order', 'سفارش'], ['payment', 'پرداخت'], ['service', 'خدمات'], ['cart', 'سبد'], ['catalog', 'جستجو'], ['admin', 'مدیر']];
+  const list = newest(DB.activity).filter(a => UI.f === 'all' || String(a.type).startsWith(UI.f)).slice(0, 300);
+  return shell('گزارش فعالیت', '', '<div class="tools"><div class="chips" role="group" aria-label="نوع رویداد">' + groups.map(([k, l]) => '<button class="chip" data-a="filter" data-f="' + k + '" aria-pressed="' + (UI.f === k) + '">' + l + '</button>').join('') + '</div></div>'
+    + '<section class="card pad">' + feed(list) + '</section>');
+};
+V.data = () => {
+  const counts = COLS.map(c => '<tr><td>' + c + '</td><td class="num">' + fa(DB[c].length) + '</td></tr>').join('');
+  return shell('داده و تنظیمات', '', '<div class="grid two"><section class="card pad"><h2 style="margin:0 0 8px;font-size:16px">منبع داده</h2>'
+    + (ONLINE ? '<p>پنل به <b>server.js</b> متصل است و همهٔ تغییرات در فایل <b>db.json</b> ذخیره می‌شوند.</p>'
+              : '<p>سرور در دسترس نیست؛ پنل از <b>داده‌های همین مرورگر</b> استفاده می‌کند که با اپلیکیشن روی همین سایت مشترک است. برای ذخیره در db.json، پروژه را با <span class="ltr">npm start</span> اجرا کنید.</p>')
+    + '<div class="actions" style="justify-content:flex-start"><button class="btn" data-a="export">دانلود db.json</button>' + (ONLINE ? '' : '<button class="btn dan" data-a="reset">پاک‌کردن داده‌های آزمایشی</button>') + '</div></section>'
+    + '<section class="card pad"><h2 style="margin:0 0 8px;font-size:16px">تعداد رکوردها</h2><div class="tbl"><table><tbody>' + counts + '</tbody></table></div></section></div>');
+};
+
+// ---------- detail drawers & forms ----------
+function openOverlay(html, kind) {
+  closeOverlay(true);
+  const wrap = document.createElement('div'); wrap.id = 'ov';
+  wrap.innerHTML = '<div class="scrim" data-a="close"></div>' + (kind === 'modal' ? '<div class="modal" role="dialog" aria-modal="true"><div class="card">' + html + '</div></div>' : '<div class="drawer" role="dialog" aria-modal="true">' + html + '</div>');
+  document.body.appendChild(wrap); OVERLAY = { ret: document.activeElement };
+  const f = wrap.querySelector('input,select,textarea,button:not(.x)') || wrap.querySelector('.x'); if (f) f.focus();
+}
+function closeOverlay(silent) { const o = $('#ov'); if (o) o.remove(); if (!silent && OVERLAY && OVERLAY.ret && OVERLAY.ret.focus) OVERLAY.ret.focus(); OVERLAY = null; }
+const head = (t) => '<div class="d-h"><h2>' + t + '</h2><button class="x" data-a="close" aria-label="بستن">×</button></div>';
+function stageControl(kind, r, act) {
+  const names = STAGES[kind] || STAGES.order, cur = r.status === 'cancelled' ? 'x' : String(+r.stage || 1);
+  return '<div class="box"><b>وضعیت</b><div class="steps" role="group" aria-label="تغییر وضعیت">'
+    + names.map((n, i) => '<button class="chip" data-a="' + act + '" data-id="' + esc(r.id) + '" data-st="' + (i + 1) + '" aria-pressed="' + (cur === String(i + 1)) + '">' + faD(i + 1) + '. ' + esc(n) + '</button>').join('')
+    + '<button class="chip" data-a="' + act + '" data-id="' + esc(r.id) + '" data-st="x" aria-pressed="' + (cur === 'x') + '" style="color:var(--err)">لغو</button></div>'
+    + '<div class="small muted">با انتخاب وضعیت، تغییر بلافاصله در اپ مشتری نمایش داده می‌شود.</div>'
+    + (Array.isArray(r.statusHistory) && r.statusHistory.length ? '<ul class="feed small" style="margin-top:8px">' + r.statusHistory.slice().reverse().map(h => '<li><span>' + (h.status === 'cancelled' ? 'لغو شد' : esc(names[(+h.stage || 1) - 1])) + '</span><time>' + when(h) + '</time></li>').join('') + '</ul>' : '') + '</div>';
+}
+function showOrder(id) {
+  const o = DB.orders.find(x => String(x.id) === String(id)); if (!o) return toast('سفارش پیدا نشد');
+  const items = (o.items || []).map(i => '<tr><td>' + esc(i.title) + '</td><td class="num">×' + fa(i.qty) + '</td><td class="num">' + toman(i.line) + '</td></tr>').join('');
+  openOverlay(head('سفارش <span class="ltr num">' + esc(o.id) + '</span>') + stageControl('order', o, 'order-stage')
+    + '<dl class="kv"><dt>مشتری</dt><dd>' + esc(custName(o)) + '</dd><dt>تلفن</dt><dd><span class="ltr num">' + esc(o.phone || '—') + '</span></dd><dt>زمان ثبت</dt><dd>' + when(o) + '</dd>'
+    + '<dt>آدرس</dt><dd>' + esc((o.addrTitle ? o.addrTitle + ' — ' : '') + (o.addrText || '—')) + '</dd><dt>زمان تحویل</dt><dd>' + esc(o.delivery || '—') + '</dd>' + (o.note ? '<dt>یادداشت</dt><dd>' + esc(o.note) + '</dd>' : '') + '</dl>'
+    + '<div class="box"><b>اقلام</b><div class="tbl"><table><tbody>' + (items || '<tr><td class="muted">—</td></tr>') + '</tbody></table></div>'
+    + '<dl class="kv" style="margin:10px 0 0"><dt>جمع اقلام</dt><dd class="num">' + toman(o.subtotal) + '</dd>' + (o.disc ? '<dt>تخفیف</dt><dd class="num">' + toman(o.disc) + (o.discCode ? ' (' + esc(o.discCode) + ')' : '') + '</dd>' : '') + '<dt><b>مبلغ کل</b></dt><dd class="num"><b>' + toman(o.total) + '</b></dd></dl></div>'
+    + '<div class="actions" style="justify-content:flex-start;margin:0 0 14px"><button class="btn sm" data-a="order-edit" data-id="' + esc(o.id) + '">ویرایش جزئیات</button><button class="btn sm dan" data-a="order-del" data-id="' + esc(o.id) + '">حذف سفارش</button></div>'
+    + '<div class="box"><b>پرداخت</b><dl class="kv" style="margin:8px 0 0">' + (o.paid ? '<dt>وضعیت</dt><dd><span class="badge ok">پرداخت آنلاین موفق</span></dd><dt>کد پیگیری</dt><dd><span class="ltr num">' + esc(o.payRef) + '</span></dd><dt>کارت</dt><dd><span class="ltr num">' + esc(o.payCard || '—') + '</span></dd>' : '<dt>وضعیت</dt><dd><span class="badge warn">پرداخت‌نشده</span></dd>') + '</dl></div>');
+}
+function showRequest(id) {
+  const r = DB.serviceRequests.find(x => String(x.id) === String(id)); if (!r) return toast('درخواست پیدا نشد');
+  openOverlay(head((KIND[r.kind] || 'درخواست') + ' <span class="ltr num">' + esc(r.id) + '</span>') + stageControl(r.kind, r, 'request-stage')
+    + '<dl class="kv"><dt>نوع</dt><dd>' + esc(KIND[r.kind] || r.kind) + '</dd><dt>مشتری</dt><dd>' + esc(custName(r)) + '</dd><dt>تلفن</dt><dd><span class="ltr num">' + esc(r.phone || '—') + '</span></dd><dt>زمان ثبت</dt><dd>' + when(r) + '</dd>'
+    + (r.delivery ? '<dt>زمان تحویل</dt><dd>' + esc(r.delivery) + '</dd>' : '') + (r.price ? '<dt>قیمت پیشنهادی</dt><dd class="num">' + toman(r.price) + '</dd>' : '')
+    + (r.desc ? '<dt>توضیحات</dt><dd>' + esc(r.desc) + '</dd>' : '') + (r.notes ? '<dt>یادداشت</dt><dd>' + esc(r.notes) + '</dd>' : '') + '</dl>'
+    + '<div class="actions" style="justify-content:flex-start"><button class="btn sm" data-a="request-edit" data-id="' + esc(r.id) + '">ویرایش جزئیات</button><button class="btn sm dan" data-a="request-del" data-id="' + esc(r.id) + '">حذف درخواست</button></div>');
+}
+function showCustomer(id) {
+  const u = DB.users.find(x => x.id === id); if (!u) return;
+  const os = newest(DB.orders.filter(o => o.userId === id)), rs = newest(DB.serviceRequests.filter(r => r.userId === id));
+  const ss = newest(DB.sessions.filter(s => s.userId === id)).slice(0, 8);
+  openOverlay(head(esc(u.name || 'مشتری')) + '<div class="actions" style="justify-content:flex-start;margin:0 0 14px"><button class="btn sm" data-a="user-edit" data-id="' + esc(u.id) + '">ویرایش</button><button class="btn sm dan" data-a="user-del" data-id="' + esc(u.id) + '">حذف کاربر</button></div><dl class="kv"><dt>تلفن</dt><dd><span class="ltr num">' + esc(u.phone) + '</span></dd><dt>عضویت</dt><dd>' + when({ at: u.createdAt }) + '</dd><dt>تعداد ورود</dt><dd class="num">' + fa(u.loginCount || 0) + '</dd></dl>'
+    + '<div class="box"><b>سفارش‌ها</b>' + table(['شماره', 'مبلغ', 'وضعیت'], os.map(o => ({ id: o.id, cells: ['<span class="ltr num">' + esc(o.id) + '</span>', '<span class="num">' + toman(o.total) + '</span>', stageBadge('order', o)] })), 'order') + '</div>'
+    + '<div class="box"><b>درخواست‌ها</b>' + table(['کد', 'نوع', 'وضعیت'], rs.map(r => ({ id: r.id, cells: ['<span class="ltr num">' + esc(r.id) + '</span>', esc(KIND[r.kind] || r.kind), stageBadge(r.kind, r)] })), 'request') + '</div>'
+    + '<div class="box"><b>ورود و خروج</b>' + (ss.length ? '<ul class="feed small">' + ss.map(s => '<li><span>' + ({ signup: 'ثبت‌نام', login: 'ورود', logout: 'خروج' }[s.type] || s.type) + '</span><time>' + when(s) + '</time></li>').join('') + '</ul>' : '<div class="muted">—</div>') + '</div>');
+}
+function productForm(id) {
+  const p = id ? DB.products.find(x => x.id === id) : { active: true, cat: 'cyl', art: 'cyl', stock: 10, price: '', specs: [] };
+  if (!p) return;
+  const specs = (p.specs || []).map(s => s[0] + ': ' + s[1]).join('\n');
+  const opt = (o, v) => Object.entries(o).map(([k, l]) => '<option value="' + k + '"' + (k === v ? ' selected' : '') + '>' + l + '</option>').join('');
+  openOverlay(head(id ? 'ویرایش محصول' : 'افزودن محصول') + '<form id="pf" class="form" novalidate data-id="' + esc(id || '') + '">'
+    + '<label class="full">نام محصول<input type="text" name="title" required value="' + esc(p.title) + '"></label>'
+    + '<label>دسته<select name="cat">' + opt(CATS, p.cat) + '</select></label>'
+    + '<label>تصویر<select name="art">' + opt(ARTS, p.art || 'cyl') + '</select></label>'
+    + '<label>زیرعنوان / نوع<input type="text" name="gas" value="' + esc(p.gas) + '" placeholder="مثلاً: اکسیژن طبی"></label>'
+    + '<label>ترتیب نمایش<input type="number" name="sort" min="0" value="' + esc(p.sort ?? '') + '"></label>'
+    + '<label>قیمت (تومان)<input type="number" name="price" min="1" step="1" required value="' + esc(p.price) + '"></label>'
+    + '<label>موجودی<input type="number" name="stock" min="0" step="1" required value="' + esc(p.stock) + '"></label>'
+    + '<label class="full">توضیحات<textarea name="desc">' + esc(p.desc) + '</textarea></label>'
+    + '<label class="full">مشخصات فنی <span class="small muted">(هر خط: عنوان: مقدار)</span><textarea name="specs" placeholder="حجم: ۱۰ لیتر">' + esc(specs) + '</textarea></label>'
+    + '<label class="check"><input type="checkbox" name="active"' + (p.active !== false ? ' checked' : '') + '> نمایش در اپ</label>'
+    + '<label class="check"><input type="checkbox" name="isNew"' + (p.isNew ? ' checked' : '') + '> برچسب «جدید»</label>'
+    + '<div class="full err-msg" id="pf-err" role="alert"></div>'
+    + '<div class="full actions">' + (id ? '<button type="button" class="btn dan" data-a="product-del" data-id="' + esc(id) + '">حذف</button>' : '') + '<button type="button" class="btn" data-a="close">انصراف</button><button type="submit" class="btn pri">ذخیره</button></div></form>', 'modal');
+}
+function serviceForm(id) {
+  const v = id ? DB.services.find(x => x.id === id) : { active: true };
+  if (!v) return;
+  openOverlay(head(id ? 'ویرایش خدمت' : 'افزودن خدمت') + '<form id="sf" class="form" novalidate data-id="' + esc(id || '') + '">'
+    + '<label class="full">عنوان خدمت<input type="text" name="title" required value="' + esc(v.title) + '"></label>'
+    + '<label class="full">توضیح کوتاه (زیر عنوان در اپ)<input type="text" name="subtitle" value="' + esc(v.subtitle) + '"></label>'
+    + '<label class="full">توضیحات<textarea name="desc">' + esc(v.desc) + '</textarea></label>'
+    + '<label>ترتیب نمایش<input type="number" name="sort" min="0" value="' + esc(v.sort ?? '') + '"></label>'
+    + '<label class="check"><input type="checkbox" name="active"' + (v.active !== false ? ' checked' : '') + '> نمایش در اپ</label>'
+    + (v.builtIn ? '<p class="full small muted">این خدمت فرم اختصاصی دارد و قابل حذف نیست؛ می‌توانید عنوان و نمایش آن را تغییر دهید.</p>' : '')
+    + '<div class="full err-msg" id="sf-err" role="alert"></div>'
+    + '<div class="full actions">' + (id && !v.builtIn ? '<button type="button" class="btn dan" data-a="service-del" data-id="' + esc(id) + '">حذف</button>' : '') + '<button type="button" class="btn" data-a="close">انصراف</button><button type="submit" class="btn pri">ذخیره</button></div></form>', 'modal');
+}
+function recordForm(formId, title, id, fields) {
+  openOverlay(head(title) + '<form id="' + formId + '" class="form" novalidate data-id="' + esc(id) + '">' + fields.map(([name, label, value, type]) =>
+      type === 'area' ? '<label class="full">' + label + '<textarea name="' + name + '">' + esc(value) + '</textarea></label>'
+      : '<label class="' + (type === 'half' || type === 'number' ? '' : 'full') + '">' + label + '<input type="' + (type === 'number' ? 'number' : 'text') + '" name="' + name + '"' + (type === 'number' ? ' min="0" step="1"' : '') + ' value="' + esc(value) + '"></label>').join('')
+    + '<div class="full err-msg" id="' + formId + '-err" role="alert"></div><div class="full actions"><button type="button" class="btn" data-a="close">انصراف</button><button type="submit" class="btn pri">ذخیره</button></div></form>', 'modal');
+}
+function orderForm(id) { const o = DB.orders.find(x => String(x.id) === String(id)); if (!o) return;
+  recordForm('of', 'ویرایش سفارش <span class="ltr num">' + esc(o.id) + '</span>', o.id, [['addrTitle', 'عنوان آدرس', o.addrTitle, 'half'], ['delivery', 'زمان تحویل', o.delivery, 'half'], ['addrText', 'آدرس تحویل', o.addrText, 'area'], ['note', 'یادداشت سفارش', o.note, 'area']]); }
+function requestForm(id) { const r = DB.serviceRequests.find(x => String(x.id) === String(id)); if (!r) return;
+  recordForm('rf', 'ویرایش درخواست <span class="ltr num">' + esc(r.id) + '</span>', r.id, r.kind === 'used'
+    ? [['price', 'قیمت پیشنهادی (تومان)', r.price || '', 'number'], ['desc', 'توضیحات', r.desc, 'area']]
+    : [['delivery', 'زمان تحویل', r.delivery, 'full'], ['notes', 'یادداشت', r.notes, 'area']]); }
+function userForm(id) { const u = DB.users.find(x => x.id === id); if (!u) return;
+  const parts = String(u.name || '').split(' ');
+  recordForm('uf', 'ویرایش کاربر', u.id, [['firstName', 'نام', u.firstName || parts[0] || '', 'half'], ['lastName', 'نام خانوادگی', u.lastName || parts.slice(1).join(' '), 'half']]);
+  $('#uf').insertAdjacentHTML('afterbegin', '<p class="full small muted" style="margin:0">تلفن <span class="ltr num">' + esc(u.phone) + '</span> شناسهٔ کاربر است و قابل تغییر نیست.</p>'); }
+async function saveRecord(form) {
+  const f = new FormData(form), id = form.dataset.id, body = {};
+  for (const [k, v] of f.entries()) body[k] = typeof v === 'string' ? v.trim() : v;
+  if (form.id === 'of') {
+    if (await write('PATCH', 'orders', id, body)) { logAdmin('ویرایش سفارش', { id }); closeOverlay(true); toast('سفارش ذخیره شد'); render(); showOrder(id); }
+  } else if (form.id === 'rf') {
+    if ('price' in body) { const n = Math.round(+body.price); if (!(n >= 0)) { $('#rf-err').textContent = 'قیمت نامعتبر است'; return; } body.price = n; }
+    if (await write('PATCH', 'serviceRequests', id, body)) { logAdmin('ویرایش درخواست', { id }); closeOverlay(true); toast('درخواست ذخیره شد'); render(); showRequest(id); }
+  } else if (form.id === 'uf') {
+    if (body.firstName.length < 2 || body.lastName.length < 2) { $('#uf-err').textContent = 'نام و نام خانوادگی را وارد کنید'; return; }
+    body.name = body.firstName + ' ' + body.lastName;
+    if (await write('PATCH', 'users', id, body)) { logAdmin('ویرایش کاربر', { id }); closeOverlay(true); toast('کاربر ذخیره شد'); render(); showCustomer(id); }
+  }
+}
+function confirmBox(text, action, id) {
+  openOverlay(head('تأیید') + '<p>' + text + '</p><div class="actions"><button class="btn" data-a="close">انصراف</button><button class="btn dan" data-a="' + action + '" data-id="' + esc(id || '') + '">بله، انجام شود</button></div>', 'modal');
+}
+
+// ---------- actions ----------
+async function setStage(col, kind, id, st) {
+  const rec = DB[col].find(x => String(x.id) === String(id)); if (!rec) return;
+  const at = new Date().toISOString(), body = st === 'x' ? { status: 'cancelled' } : { stage: +st, status: 'active' };
+  const hist = (Array.isArray(rec.statusHistory) ? rec.statusHistory : []).concat([{ ...body, stage: body.stage || rec.stage || 1, at, by: 'admin' }]);
+  if (await write('PATCH', col, id, { ...body, statusHistory: hist })) {
+    logAdmin(col === 'orders' ? 'وضعیت سفارش' : 'وضعیت درخواست', { id: String(id), status: body.status, stage: body.stage || null });
+    toast('وضعیت ذخیره شد'); render(); (col === 'orders' ? showOrder : showRequest)(id);
+  }
+}
+async function saveProduct(form) {
+  const f = new FormData(form), id = form.dataset.id, title = String(f.get('title') || '').trim();
+  const price = Math.round(+f.get('price')), stock = Math.round(+f.get('stock'));
+  const err = !title ? 'نام محصول را وارد کنید' : !(price > 0) ? 'قیمت باید عددی بزرگ‌تر از صفر باشد' : !(stock >= 0) ? 'موجودی نمی‌تواند منفی باشد' : '';
+  if (err) { $('#pf-err').textContent = err; return; }
+  const specs = String(f.get('specs') || '').split('\n').map(l => l.trim()).filter(Boolean).map(l => { const i = l.indexOf(':'); return i > 0 ? [l.slice(0, i).trim(), l.slice(i + 1).trim()] : [l, '']; });
+  const body = { title, cat: f.get('cat'), art: f.get('art'), gas: String(f.get('gas') || '').trim(), price, stock, desc: String(f.get('desc') || '').trim(), specs,
+    active: !!f.get('active'), isNew: !!f.get('isNew'), sort: f.get('sort') === '' ? (DB.products.length + 1) : +f.get('sort') };
+  const pid = id || ('p_' + Date.now().toString(36));
+  if (await write(id ? 'PATCH' : 'PUT', 'products', pid, body)) { logAdmin(id ? 'ویرایش محصول' : 'افزودن محصول', { id: pid, title }); closeOverlay(); toast('محصول ذخیره شد'); render(); }
+}
+async function saveService(form) {
+  const f = new FormData(form), id = form.dataset.id, title = String(f.get('title') || '').trim();
+  if (!title) { $('#sf-err').textContent = 'عنوان خدمت را وارد کنید'; return; }
+  const body = { title, subtitle: String(f.get('subtitle') || '').trim(), desc: String(f.get('desc') || '').trim(), active: !!f.get('active'),
+    sort: f.get('sort') === '' ? (DB.services.length + 1) : +f.get('sort') };
+  const sid = id || ('s_' + Date.now().toString(36));
+  if (!id) Object.assign(body, { kind: 'custom', builtIn: false });
+  if (await write(id ? 'PATCH' : 'PUT', 'services', sid, body)) { logAdmin(id ? 'ویرایش خدمت' : 'افزودن خدمت', { id: sid, title }); closeOverlay(); toast('خدمت ذخیره شد'); render(); }
+}
+function exportDb() {
+  const blob = new Blob([JSON.stringify(DB, null, 2) + '\n'], { type: 'application/json' });
+  const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = 'db.json'; document.body.appendChild(a); a.click();
+  setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 500);
+}
+
+const ACTIONS = {
+  close: () => closeOverlay(),
+  refresh: async () => { await load(); render(); toast('به‌روز شد'); },
+  logout: () => { try { sessionStorage.removeItem('emdad:admin'); } catch (e) {} clearInterval(POLL); boot(); },
+  filter: (el) => { UI.f = el.dataset.f; render(); },
+  order: (el) => showOrder(el.dataset.id),
+  request: (el) => showRequest(el.dataset.id),
+  customer: (el) => showCustomer(el.dataset.id),
+  product: (el) => productForm(el.dataset.id),
+  service: (el) => serviceForm(el.dataset.id),
+  'product-new': () => productForm(null),
+  'service-new': () => serviceForm(null),
+  'order-stage': (el) => setStage('orders', 'order', el.dataset.id, el.dataset.st),
+  'request-stage': (el) => { const r = DB.serviceRequests.find(x => String(x.id) === el.dataset.id); setStage('serviceRequests', r && r.kind, el.dataset.id, el.dataset.st); },
+  'product-del': (el) => confirmBox('محصول «' + esc((DB.products.find(p => p.id === el.dataset.id) || {}).title) + '» حذف شود؟ از سبد مشتریان هم حذف می‌شود.', 'product-del-ok', el.dataset.id),
+  'product-del-ok': async (el) => { if (await write('DELETE', 'products', el.dataset.id)) { logAdmin('حذف محصول', { id: el.dataset.id }); closeOverlay(); toast('محصول حذف شد'); render(); } },
+  'service-del': (el) => confirmBox('این خدمت حذف شود؟', 'service-del-ok', el.dataset.id),
+  'service-del-ok': async (el) => { if (await write('DELETE', 'services', el.dataset.id)) { logAdmin('حذف خدمت', { id: el.dataset.id }); closeOverlay(); toast('خدمت حذف شد'); render(); } },
+  'order-edit': (el) => orderForm(el.dataset.id),
+  'request-edit': (el) => requestForm(el.dataset.id),
+  'user-edit': (el) => userForm(el.dataset.id),
+  'order-del': (el) => confirmBox('سفارش <span class="ltr num">' + esc(el.dataset.id) + '</span> حذف شود؟ از فهرست سفارش‌های مشتری در اپ هم حذف می‌شود. سابقهٔ پرداخت آن (در صورت وجود) برای حسابرسی باقی می‌ماند.', 'order-del-ok', el.dataset.id),
+  'order-del-ok': async (el) => { if (await write('DELETE', 'orders', el.dataset.id)) { logAdmin('حذف سفارش', { id: el.dataset.id }); closeOverlay(); toast('سفارش حذف شد'); render(); } },
+  'request-del': (el) => confirmBox('درخواست <span class="ltr num">' + esc(el.dataset.id) + '</span> حذف شود؟ از فهرست درخواست‌های مشتری در اپ هم حذف می‌شود.', 'request-del-ok', el.dataset.id),
+  'request-del-ok': async (el) => { if (await write('DELETE', 'serviceRequests', el.dataset.id)) { logAdmin('حذف درخواست', { id: el.dataset.id }); closeOverlay(); toast('درخواست حذف شد'); render(); } },
+  'user-del': (el) => confirmBox('کاربر «' + esc((userOf(el.dataset.id) || {}).name || el.dataset.id) + '» حذف شود؟ اگر در اپ وارد شده باشد، از حسابش خارج می‌شود. سفارش‌ها و درخواست‌هایش برای سابقه باقی می‌مانند.', 'user-del-ok', el.dataset.id),
+  'user-del-ok': async (el) => { if (await write('DELETE', 'users', el.dataset.id)) { logAdmin('حذف کاربر', { id: el.dataset.id }); closeOverlay(); toast('کاربر حذف شد'); render(); } },
+  export: () => exportDb(),
+  reset: () => confirmBox('سفارش‌ها، درخواست‌ها، پرداخت‌ها، کاربران و گزارش‌های همین مرورگر پاک شوند؟ محصولات و خدمات باقی می‌مانند.', 'reset-ok'),
+  'reset-ok': () => { const m = readMirror(); ['users','sessions','carts','wishlists','addressBooks','orders','payments','serviceRequests','activity'].forEach(c => { m[c] = []; });
+    writeMirror(m); DB = m; closeOverlay(); toast('داده‌های آزمایشی پاک شد'); render(); },
+};
+
+function render() {
+  if (!(VIEW in V)) VIEW = 'overview';
+  const y = window.scrollY, focusQ = document.activeElement && document.activeElement.id === 'q', sel = focusQ ? document.activeElement.selectionStart : 0;
+  $('#app').innerHTML = V[VIEW]();
+  document.title = (NAV.find(n => n[0] === VIEW) || [, ''])[1] + ' · پنل مدیریت امداد اکسیژن';
+  if (focusQ) { const q = $('#q'); if (q) { q.focus(); try { q.setSelectionRange(sel, sel); } catch (e) {} } }
+  window.scrollTo(0, y);
+}
+function route() { closeOverlay(true); const h = location.hash.slice(1); if (h !== VIEW) { VIEW = h || 'overview'; UI = { q: '', f: 'all' }; } render(); window.scrollTo(0, 0); }   // a section change closes any open drawer/modal
+
+document.addEventListener('click', (e) => {
+  const el = e.target.closest('[data-a]'); if (!el) return;
+  const fn = ACTIONS[el.dataset.a]; if (fn) { e.preventDefault(); fn(el); }
+});
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape' && $('#ov')) { closeOverlay(); return; }
+  if ((e.key === 'Enter' || e.key === ' ') && e.target.matches('tr[data-a]')) { e.preventDefault(); ACTIONS[e.target.dataset.a](e.target); }
+});
+document.addEventListener('input', (e) => { if (e.target.id === 'q') { UI.q = e.target.value; render(); } });
+document.addEventListener('submit', (e) => { e.preventDefault(); const id = e.target.id; if (id === 'pf') saveProduct(e.target); else if (id === 'sf') saveService(e.target); else if (id === 'of' || id === 'rf' || id === 'uf') saveRecord(e.target); });
+
+// ---------- sign-in gate (demo) & boot ----------
+function loginView(err) {
+  $('#app').innerHTML = '<div class="login"><form class="card" id="lf"><div class="logo" style="margin:0 auto 12px;width:56px;height:56px;font-size:18px">O₂</div>'
+    + '<h1 style="margin:0;font-size:19px">پنل مدیریت امداد اکسیژن</h1><p class="muted small" style="margin:4px 0 0">برای ورود رمز مدیر را وارد کنید</p>'
+    + '<input type="password" id="pw" autocomplete="current-password" aria-label="رمز مدیر" placeholder="رمز مدیر" dir="ltr">'
+    + '<div class="err-msg" role="alert">' + (err || '') + '</div><button class="btn pri" style="width:100%;height:46px">ورود</button>'
+    + '<div class="hint">نسخهٔ آزمایشی — رمز: <b dir="ltr">' + ADMIN_PASS + '</b><br>این فقط یک دروازهٔ نمایشی است، نه امنیت واقعی.</div></form></div>';
+  $('#pw').focus();
+  $('#lf').onsubmit = (e) => { e.preventDefault(); if ($('#pw').value === ADMIN_PASS) { try { sessionStorage.setItem('emdad:admin', '1'); } catch (er) {} start(); } else loginView('رمز نادرست است'); };
+}
+async function start() {
+  ONLINE = await probe(); await load(); VIEW = location.hash.slice(1) || 'overview'; render();
+  window.onhashchange = route;
+  window.addEventListener('storage', (e) => { if (e.key === LOCAL && !ONLINE && !$('#ov')) { DB = readMirror(); render(); } });   // live: app activity in another tab
+  clearInterval(POLL); POLL = setInterval(async () => { if (ONLINE && !$('#ov') && document.visibilityState === 'visible') { await load(); render(); } }, 10000);
+}
+function boot() { let ok = false; try { ok = sessionStorage.getItem('emdad:admin') === '1'; } catch (e) {} ok ? start() : loginView(); }
+boot();
+</script>
+</body>
+</html>
