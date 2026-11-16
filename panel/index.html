@@ -50,7 +50,7 @@ a{color:var(--p-ink)}
 .nav a{display:flex;align-items:center;gap:10px;padding:9px 12px;border-radius:12px;text-decoration:none;color:var(--tx);font-weight:500}
 .nav a:hover{background:var(--sur2)}
 .nav a[aria-current="page"]{background:var(--p-soft);color:var(--p-ink);font-weight:700}
-.nav .count{margin-inline-start:auto;background:var(--err);color:#fff;border-radius:999px;font-size:11px;min-width:20px;height:20px;display:grid;place-items:center;padding:0 6px}
+.nav .count{margin-inline-start:auto;background:var(--err);color:var(--on-err,#fff);border-radius:999px;font-size:11px;min-width:20px;height:20px;display:grid;place-items:center;padding:0 6px}
 .side .foot{margin-top:auto;display:flex;flex-direction:column;gap:8px;font-size:12px;color:var(--tx2)}
 /* ☰ menu button: first item of the top bar (right side, RTL); the sidebar collapses to zero width (desktop) */
 .burger{flex:none;width:42px;height:42px;border-radius:12px;border:1px solid var(--line);background:var(--sur);color:var(--tx);display:grid;place-items:center;cursor:pointer;box-shadow:var(--shadow);padding:0}
@@ -76,7 +76,7 @@ a{color:var(--p-ink)}
 .btn:hover{border-color:var(--p)}
 .btn.pri{background:var(--p-deep);border-color:transparent;color:#fff}
 .btn.dan{color:var(--err);border-color:color-mix(in oklab,var(--err) 40%,var(--line))}
-.btn.sm{height:32px;padding:0 12px;font-size:13px}
+.btn.sm{height:32px;position:relative;padding:0 12px;font-size:13px}
 .card{background:var(--sur);border:1px solid var(--line);border-radius:var(--r);box-shadow:var(--shadow)}
 .pad{padding:16px 18px}
 .grid{display:grid;gap:14px}
@@ -112,7 +112,7 @@ tbody tr.click{cursor:pointer} tbody tr.click:hover{background:var(--sur2)}
 .dot{width:10px;height:10px;border-radius:999px;flex:none}
 
 /* ---- overview ---- */
-.ov{display:grid;gap:14px}
+.ov{display:grid;gap:14px;grid-template-columns:minmax(0,1fr)}
 .ic{width:38px;height:38px;border-radius:12px;display:grid;place-items:center;flex:none;background:var(--p-soft);color:var(--p-ink)}
 .ic.acc{background:var(--acc-soft);color:var(--acc-ink)} .ic.ok{background:var(--ok-soft);color:var(--ok)}
 .ic.warn{background:var(--warn-soft);color:var(--warn)} .ic.err{background:var(--err-soft);color:var(--err)} .ic.mute{background:var(--fill);color:var(--tx2)}
@@ -164,9 +164,9 @@ a.stat:hover{border-color:var(--p)}
 .seg i:nth-child(1){opacity:.4}.seg i:nth-child(2){opacity:.62}.seg i:nth-child(3){opacity:.82}
 .steps4{list-style:none;margin:0;padding:0;display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:6px}
 .steps4 li{position:relative;display:grid;gap:2px;justify-items:center;text-align:center;padding:12px 4px;border-radius:10px;background:var(--chart-track)}
-.steps4 li:not(:last-child)::after{content:'›';position:absolute;inset-inline-end:-6px;top:50%;transform:translateY(-50%);font-size:14px;line-height:1;color:var(--tx2);z-index:1}
+.steps4 li:not(:last-child)::after{content:'‹';position:absolute;inset-inline-end:-9px;top:50%;transform:translateY(-50%);font-size:14px;line-height:1;color:var(--tx2);z-index:1}
 .steps4 b{font-size:18px;line-height:1.2}
-.steps4 small{font-size:11px;color:var(--tx2);line-height:1.3}
+.steps4 small{font-size:11px;color:var(--tx2);line-height:1.3;overflow-wrap:anywhere}
 .steps4 li.done{background:var(--ok-soft)}
 .pipe .cx{justify-self:start;font-size:12px;color:var(--tx2);padding:3px 10px;border-radius:999px;border:1px solid var(--line)}
 .meters{display:grid;gap:9px}
@@ -184,6 +184,7 @@ button.row{cursor:pointer} button.row:hover{background:var(--sur2)}
 .rlist .e{display:flex;flex-direction:column;align-items:flex-end;gap:3px;font-size:12.5px;white-space:nowrap}
 @media (max-width:1100px){.stats{grid-template-columns:repeat(2,minmax(0,1fr))}}
 @media (max-width:1000px){.ov-row,.ov-row.even{grid-template-columns:minmax(0,1fr)}}
+@media (max-width:1400px){.pipes{grid-template-columns:minmax(0,1fr)}}   /* stack the two pipelines until the card is wide enough */
 @media (max-width:520px){.pipes{grid-template-columns:minmax(0,1fr)} .stat{padding:12px} .stat .ic{width:34px;height:34px} .stat .v{font-size:18px}}
 
 /* ---- drawer & modal ---- */
@@ -224,6 +225,16 @@ button.row{cursor:pointer} button.row:hover{background:var(--sur2)}
 }
 @media (prefers-reduced-motion:no-preference) and (max-width:860px){.side{transition:transform .25s ease,visibility .25s}}
 @media (prefers-reduced-motion:no-preference){.drawer{animation:dIn .22s ease-out}@keyframes dIn{from{transform:translateX(-30px);opacity:0}}}
+::placeholder{color:var(--tx2);opacity:1}
+:root[data-theme=dark]{--on-err:#2a0a0c}
+.search,.form input[type=text],.form input[type=number],.form select,.form textarea,.field,.login input{border-color:color-mix(in oklab,var(--tx2) 55%,transparent)}
+/* touch targets: 44px hit area without changing the layout */
+.btn.sm::after,.x::after{content:"";position:absolute;inset:-6px}
+.x{position:relative}
+.burger,.theme-btn{width:44px;height:44px}
+.nav a{min-height:44px}
+.check{min-height:44px}.check input{width:20px;height:20px;accent-color:var(--p)}
+@media (pointer:coarse){.btn{min-height:44px}.chip{min-height:44px}}
 </style>
 <script>try { if (localStorage.getItem('emdad-prototype:panel-theme') === 'dark') document.documentElement.dataset.theme = 'dark'; } catch (e) {}</script>
 </head>
@@ -257,7 +268,7 @@ const ACT = { 'auth.signup': 'ثبت‌نام', 'auth.login': 'ورود', 'auth.
   'service.request': 'درخواست خدمت', 'service.interest': 'علاقه به خدمت', 'profile.rename': 'تغییر نام', 'settings.theme': 'تغییر تم',
   'catalog.search': 'جستجو', 'catalog.filter': 'فیلتر دسته', 'admin': 'اقدام مدیر' };
 
-let DB = null, ONLINE = false, VIEW = 'overview', UI = { q: '', f: 'all' }, OVERLAY = null, POLL = null;
+let DB = null, ONLINE = false, SERVER_SEEN = false, VIEW = 'overview', UI = { q: '', f: 'all' }, OVERLAY = null, POLL = null;
 // sidebar: hidden/shown on desktop (remembered in this browser), slide-in open/closed on phones (not remembered)
 const SIDE_KEY = 'emdad-prototype:panel-side';
 let SIDE_HIDDEN = (() => { try { return localStorage.getItem(SIDE_KEY) === 'hidden'; } catch (e) { return false; } })(), SIDE_OPEN = false;
@@ -327,6 +338,7 @@ function applyLocal(db, method, col, id, body) {
   db.meta.updatedAt = now;
 }
 async function write(method, col, id, body) {
+  if (!ONLINE && SERVER_SEEN) { toast('ارتباط با سرور قطع است؛ تغییر ذخیره نشد'); return false; }   // never fork the data into the browser copy
   if (ONLINE) {
     const url = API + '/' + col + (id != null ? '/' + encodeURIComponent(id) : '');
     const r = await fetch(url, { method, headers: { 'Content-Type': 'application/json' }, body: method === 'DELETE' ? undefined : JSON.stringify(body || {}) }).catch(() => null);
@@ -639,7 +651,7 @@ function showCustomer(id) {
   openOverlay(head(esc(u.name || 'مشتری')) + '<div class="actions" style="justify-content:flex-start;margin:0 0 14px"><button class="btn sm" data-a="user-edit" data-id="' + esc(u.id) + '">ویرایش</button><button class="btn sm dan" data-a="user-del" data-id="' + esc(u.id) + '">حذف کاربر</button></div><dl class="kv"><dt>تلفن</dt><dd><span class="ltr num">' + esc(u.phone) + '</span></dd><dt>عضویت</dt><dd>' + when({ at: u.createdAt }) + '</dd><dt>تعداد ورود</dt><dd class="num">' + fa(u.loginCount || 0) + '</dd></dl>'
     + '<div class="box"><b>سفارش‌ها</b>' + table(['شماره', 'مبلغ', 'وضعیت'], os.map(o => ({ id: o.id, cells: ['<span class="ltr num">' + esc(o.id) + '</span>', '<span class="num">' + toman(o.total) + '</span>', stageBadge('order', o)] })), 'order') + '</div>'
     + '<div class="box"><b>درخواست‌ها</b>' + table(['کد', 'نوع', 'وضعیت'], rs.map(r => ({ id: r.id, cells: ['<span class="ltr num">' + esc(r.id) + '</span>', esc(KIND[r.kind] || r.kind), stageBadge(r.kind, r)] })), 'request') + '</div>'
-    + '<div class="box"><b>ورود و خروج</b>' + (ss.length ? '<ul class="feed small">' + ss.map(s => '<li><span>' + ({ signup: 'ثبت‌نام', login: 'ورود', logout: 'خروج' }[s.type] || s.type) + '</span><time>' + when(s) + '</time></li>').join('') + '</ul>' : '<div class="muted">—</div>') + '</div>');
+    + '<div class="box"><b>ورود و خروج</b>' + (ss.length ? '<ul class="feed small">' + ss.map(s => '<li><span>' + ({ signup: 'ثبت‌نام', login: 'ورود', logout: 'خروج' }[s.type] || esc(s.type)) + '</span><time>' + when(s) + '</time></li>').join('') + '</ul>' : '<div class="muted">—</div>') + '</div>');
 }
 function productForm(id) {
   const p = id ? DB.products.find(x => x.id === id) : { active: true, cat: 'cyl', art: 'cyl', stock: 10, price: '', specs: [] };
@@ -849,10 +861,14 @@ function loginView(err) {
   $('#lf').onsubmit = (e) => { e.preventDefault(); if ($('#pw').value === ADMIN_PASS) { try { sessionStorage.setItem('emdad-prototype:admin', '1'); } catch (er) {} start(); } else loginView('رمز نادرست است'); };
 }
 async function start() {
-  ONLINE = await probe(); await load(); VIEW = location.hash.slice(1) || 'overview'; render();
+  ONLINE = await probe(); SERVER_SEEN = ONLINE; await load(); VIEW = location.hash.slice(1) || 'overview'; render();
   window.onhashchange = route;
   window.addEventListener('storage', (e) => { if (e.key === LOCAL && !ONLINE && !$('#ov')) { DB = readMirror(); render(); } });   // live: app activity in another tab
-  clearInterval(POLL); POLL = setInterval(async () => { if (ONLINE && !$('#ov') && document.visibilityState === 'visible') { await load(); render(); } }, 10000);
+  clearInterval(POLL); POLL = setInterval(async () => {
+    if ($('#ov') || document.visibilityState !== 'visible') return;
+    if (!ONLINE && SERVER_SEEN) ONLINE = await probe();      // the server was there: keep trying to reconnect
+    if (ONLINE) { await load(); render(); }
+  }, 10000);
 }
 function boot() { let ok = false; try { ok = sessionStorage.getItem('emdad-prototype:admin') === '1'; } catch (e) {} ok ? start() : loginView(); }
 boot();
