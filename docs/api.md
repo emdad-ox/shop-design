@@ -61,3 +61,13 @@ Response `201 { record }` (authoritative values — the client must adopt them).
 * `POST` with an existing id → **409**.
 * Failed disk write → **500** `{ error:'write_failed' }` and the in-memory state is rolled back to what is on disk.
 * No CORS headers are sent (same-origin only).
+
+## Clarifications (found while implementing the clients)
+* Admin `PUT`/`PATCH` on a missing id is **404** for every collection except `users` and the owner-scoped
+  `carts`/`wishlists`/`addressBooks`; create records with `POST`.
+* A cancel appends two `statusHistory` entries when the stage also moved, and always
+  `{ at, from: 'active', to: 'cancelled', by }`.
+* A cancelled or stage-4 order/request answers **422** `{ error: 'read_only' }` to anything except changes to
+  `notes`, `technicianId` and `delivery`. Other admin-set descriptive fields (e.g. `technicianName`, `assignedAt`,
+  `offeredPrice`) are accepted on open records.
+* `statusHistory`, `userId`, `createdAt` and `id` sent by a client on PATCH/PUT are ignored.
