@@ -6,7 +6,7 @@ Vazir font and images are inlined, so nothing else is needed.
 | File | What it is |
 |---|---|
 | `shop/index.html` | The shop app — demo login code `123456` |
-| `panel/index.html` | Admin dashboard — password `emdad-admin` |
+| `panel/index.html` | Admin dashboard — password `emdad` |
 | `index.html` | Sends visitors from the site root to `shop/` |
 | `db.json` | Database (seed: 8 products, 2 services) |
 | `server.js`, `package.json` | Server for `db.json` (zero dependencies, Node ≥ 18) |
