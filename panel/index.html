@@ -501,16 +501,7 @@ V.overview = () => {
           + '<span class="e">' + (isO ? '<span class="num">' + toman(r.total) + '</span>' : '') + stageBadge(isO ? 'order' : r.kind, r) + '</span></button></li>';
       }).join('') + '</ul>' : '<div class="empty">هنوز سفارش یا درخواستی ثبت نشده است</div>')
     + '</section>';
-  const acts = newest(DB.activity).slice(0, 6);
-  const activity = '<section class="card pad"><div class="sec-h"><h2>آخرین فعالیت‌ها</h2><a href="#activity">گزارش کامل</a></div>'
-    + (acts.length ? '<ul class="rlist">' + acts.map(a => {
-        const d = a.data || {}, [ic, cls] = actIcon(a.type), who = a.userId === 'admin' ? 'مدیر' : (userOf(a.userId) || {}).name || 'مهمان';
-        const extra = d.what ? esc(d.what) : d.no ? '<span class="ltr">' + esc(d.no) + '</span>' : d.code ? '<span class="ltr">' + esc(d.code) + '</span>' : d.q ? '«' + esc(d.q) + '»' : '';
-        return '<li><div class="row">' + I(ic, cls, 1) + '<span class="t"><b>' + esc(ACT[a.type] || a.type) + (extra ? SEP + extra : '') + '</b><small>' + esc(who) + '</small></span><span class="e muted">' + relTime(a) + '</span></div></li>';
-      }).join('') + '</ul>' : '<div class="empty">هنوز فعالیتی ثبت نشده است</div>')
-    + '</section>';
-
-  return shell('نمای کلی', '', '<div class="ov">' + attention + stats + '<div class="ov-row">' + trend + status + '</div><div class="ov-row even">' + latest + activity + '</div></div>');
+  return shell('نمای کلی', '', '<div class="ov">' + attention + stats + '<div class="ov-row">' + trend + status + '</div>' + latest + '</div>');
 };
 function feed(list) {
   if (!list.length) return '<div class="empty">هنوز فعالیتی ثبت نشده است</div>';
