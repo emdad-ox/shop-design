@@ -14,8 +14,21 @@
  *                   (no SMS provider is wired in).
  *   DB_FILE         runtime database (default data/db.json; created from the seed ./db.json on first run)
  *
- * Serves shop/ and panel/ AND a REST API over the database. Who may do what, the order/stock rules and the
- * lifecycle rules are documented in docs/api.md. Every write is persisted atomically (temp file + rename),
+ * Serves shop/ and panel/ AND a REST API over the database.
+ *
+ * API (JSON; errors are { error, message? }):
+ *   POST /api/admin/login {password}            → { token }   send as header X-Admin-Token
+ *   POST /api/auth/otp {phone} · /api/auth/verify {phone, code, firstName?, lastName?} → { token, user }   send as Bearer
+ *   GET  /api/health · /api/catalog             public (catalog = active products + services)
+ *   GET  /api/me                                the signed-in customer's own records
+ *   GET  /api/db · /api/<collection>[/<id>]     admin only
+ *   POST/PUT/PATCH/DELETE /api/<collection>…    admin, or a customer on their own records (carts, wishlists, addressBooks,
+ *                                               orders, serviceRequests, activity, sessions, own user name)
+ * Orders (POST /api/orders): items need pid; the server checks and decrements stock, recomputes totals and the
+ * discount, creates the payment, and answers 409 out_of_stock / duplicate_id. Orders and requests move forward one
+ * stage at a time (422 otherwise); cancelling restocks and marks the payment refund_pending; an admin then PATCHes
+ * the payment to refunded. Customers can only flag cancelRequested while stage <= 2.
+ * Every write is persisted atomically (temp file + rename),
  * one write at a time, and is rolled back in memory if the disk write fails.
  */
 'use strict';
@@ -524,7 +537,7 @@ const server = http.createServer((req, res) => {
 server.listen(PORT, HOST, () => {
   console.log('Emdad Oxygen shop  → http://localhost:' + PORT + '/shop/');
   console.log('Admin panel       → http://localhost:' + PORT + '/panel/');
-  console.log('Database           → ' + DB_FILE + '  (docs/api.md)');
+  console.log('Database           → ' + DB_FILE + '  (API: see the header of server.js)');
   if (!process.env.ADMIN_PASSWORD) console.warn('[security] ADMIN_PASSWORD is not set: the admin password is the demo default. Set it before exposing this server.');
   if (FIXED_OTP) console.warn('[security] every phone accepts the one-time code ' + (process.env.OTP_CODE ? '(OTP_CODE)' : '"123456" (demo)') + '. Set NODE_ENV=production and wire an SMS provider before going live.');
 });

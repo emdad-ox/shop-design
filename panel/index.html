@@ -443,7 +443,7 @@ function applyLocal(db, method, col, id, body) {
     const rec = { ...base, ...body, id, updatedAt: now }; if (idx < 0) list.push(rec); else list[idx] = rec; }
   db.meta.updatedAt = now;
 }
-// Offline mode mimics the server's lifecycle rules (docs/api.md). Mutates m and body; returns an error text or null.
+// Offline mode mimics the server's lifecycle rules (see server.js). Mutates m and body; returns an error text or null.
 const RO_OK = ['notes', 'technicianId', 'technicianName', 'assignedAt', 'delivery'];
 function localRules(m, col, id, body, method) {
   const find = (c, x) => m[c].find(r => String(r.id) === String(x));

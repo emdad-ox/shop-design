@@ -27,12 +27,13 @@ npm start            # → shop: http://localhost:3000/shop/   panel: http://loc
 
 With the server running, every login, order and service request is stored in `data/db.json` and the shop and
 dashboard share it across devices. Customers and the admin sign in through the server and only see what they
-are allowed to — see [`docs/api.md`](docs/api.md) for the API, the stock/order rules and the order lifecycle.
+are allowed to: the admin signs in with `ADMIN_PASSWORD`, customers with their phone and the one-time code, and the
+API (`/api/catalog`, `/api/me`, admin-only `/api/db` and collections) is described at the top of `server.js`. The server
+checks and decrements stock when an order is placed, and orders move forward one stage at a time (cancelling restocks
+and marks the payment for refund).
 Without a server (GitHub Pages, or opening the file directly) the shop and dashboard are a browser-only demo
 that shares data through the browser (storage keys `emdad-prototype:*`); there is no real authentication in
 that mode.
-
-Review reports and what was changed because of them: [`docs/review/`](docs/review/README.md).
 
 Public site: https://emdad-ox.github.io/shop-design/shop/ (panel: https://emdad-ox.github.io/shop-design/panel/).
 
