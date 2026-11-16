@@ -6,9 +6,9 @@ Vazir font and images are inlined, so nothing else is needed.
 | File | What it is |
 |---|---|
 | `shop/index.html` | The shop app — demo login code `123456` |
-| `panel/index.html` | Admin dashboard — password `emdad` |
+| `panel/index.html` | Admin dashboard (password: `ADMIN_PASSWORD`, see below) |
 | `index.html` | Sends visitors from the site root to `shop/` |
-| `db.json` | Database (seed: 8 products, 2 services) |
+| `db.json` | Seed catalogue (8 products, 2 services) — never holds customer data |
 | `server.js`, `package.json` | Server for `db.json` (zero dependencies, Node ≥ 18) |
 
 ## Run it
@@ -17,10 +17,22 @@ Vazir font and images are inlined, so nothing else is needed.
 npm start            # → shop: http://localhost:3000/shop/   panel: http://localhost:3000/panel/
 ```
 
-With the server running, every login, order and service request is written to `db.json`, and the
-app and dashboard share it across devices. Without a server (GitHub Pages, or opening the file
-directly) the app and dashboard share data through the browser only (storage keys
-`emdad-prototype:*`).
+| Variable | Default | Meaning |
+|---|---|---|
+| `PORT` | `3000` | listen port |
+| `HOST` | `127.0.0.1` (`0.0.0.0` when `PORT` is set) | bind address |
+| `ADMIN_PASSWORD` | `emdad` (demo — a warning is printed) | admin dashboard password, checked by the server |
+| `OTP_CODE` | `123456` (demo) | the one-time code every phone accepts; with `NODE_ENV=production` and no `OTP_CODE` a random code is printed to the console (no SMS provider is wired in) |
+| `DB_FILE` | `data/db.json` | runtime database (git-ignored; created from the seed `db.json` on first run) |
+
+With the server running, every login, order and service request is stored in `data/db.json` and the shop and
+dashboard share it across devices. Customers and the admin sign in through the server and only see what they
+are allowed to — see [`docs/api.md`](docs/api.md) for the API, the stock/order rules and the order lifecycle.
+Without a server (GitHub Pages, or opening the file directly) the shop and dashboard are a browser-only demo
+that shares data through the browser (storage keys `emdad-prototype:*`); there is no real authentication in
+that mode.
+
+Review reports and what was changed because of them: [`docs/review/`](docs/review/README.md).
 
 Public site: https://emdad-ox.github.io/shop-design/shop/ (panel: https://emdad-ox.github.io/shop-design/panel/).
 

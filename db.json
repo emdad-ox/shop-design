@@ -260,8 +260,8 @@
     {
       "id": "used",
       "kind": "used",
-      "title": "تعمیر تجهیزات",
-      "subtitle": "تجهیزات خود را به ما بسپارید",
+      "title": "فروش تجهیزات",
+      "subtitle": "تجهیزات خود را با قیمت پیشنهادی ثبت کنید",
       "active": true,
       "builtIn": true,
       "sort": 2
