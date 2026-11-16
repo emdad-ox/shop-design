@@ -71,3 +71,11 @@ Response `201 { record }` (authoritative values — the client must adopt them).
   `notes`, `technicianId` and `delivery`. Other admin-set descriptive fields (e.g. `technicianName`, `assignedAt`,
   `offeredPrice`) are accepted on open records.
 * `statusHistory`, `userId`, `createdAt` and `id` sent by a client on PATCH/PUT are ignored.
+
+## Shapes and error codes the shop relies on
+* `GET /api/me` → `cart`, `wishlist` and `addressBook` are the stored documents written with `PUT /api/carts|wishlists|addressBooks/<userId>`
+  (`{ items:[{pid,title,qty,unitPrice}], count }`, `{ items:[{pid,title}] }`, `{ addresses:[…] }`), or `null`.
+* Cancel request after stage 2 or on a cancelled order → **422** `{ error:'illegal_transition' }`.
+* `401 wrong_code` = bad one-time code at `/api/auth/verify`; `401 session_expired` = a token that was sent but is unknown/expired
+  (the client must sign out); `401 unauthorized` = no credentials.
+* `403 forbidden` = authenticated but not allowed; `429 too_many_attempts` on repeated bad passwords/codes.
