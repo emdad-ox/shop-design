@@ -33,7 +33,7 @@ const DB_FILE = path.join(ROOT, 'db.json');
 const PORT = Number(process.env.PORT) || 3000;
 const MAX_BODY = 8 * 1024 * 1024;   // photos arrive as data URLs; keep a sane ceiling
 const COLLECTIONS = ['users', 'sessions', 'carts', 'wishlists', 'addressBooks',
-                     'orders', 'payments', 'serviceRequests', 'products', 'services', 'activity'];
+                     'orders', 'payments', 'serviceRequests', 'products', 'services', 'activity', 'technicians'];
 
 function emptyDb() {
   const db = { meta: { app: 'emdad-oxygen-shop', schema: 1, updatedAt: null } };
