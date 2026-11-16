@@ -1,2 +1,5 @@
-db.json.tmp
 node_modules/
+data/
+db.json.tmp
+db.json.corrupt-*
+*.corrupt-*
