@@ -153,7 +153,7 @@ function serveStatic(req, res, urlPath) {
   fs.stat(file, (err, st) => {
     if (!err && st.isDirectory()) {
       // a folder (shop/, panel/) serves its index.html; without the trailing slash, redirect so the
-      // pages' relative addresses (../api, ../db.json) resolve from inside the folder
+      // pages' relative addresses (../api) resolve from inside the folder
       if (!rel.endsWith('/')) { res.writeHead(301, { Location: rel + '/' }); return res.end(); }
       file = path.join(file, 'index.html');
       return fs.stat(file, (e2, st2) => send200(e2, st2));
