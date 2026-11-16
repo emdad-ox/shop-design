@@ -47,7 +47,12 @@ function loadDb() {
     db.meta = db.meta || emptyDb().meta;
     return db;
   } catch (e) {
-    if (e.code !== 'ENOENT') console.warn('[db] db.json unreadable, starting empty:', e.message);
+    if (e.code !== 'ENOENT') {
+      // keep the unreadable file instead of overwriting it with an empty database on the next write
+      const keep = DB_FILE + '.corrupt-' + Date.now();
+      try { fs.renameSync(DB_FILE, keep); } catch (e2) { /* nothing more to do */ }
+      console.warn('[db] db.json unreadable (' + e.message + '); moved to ' + path.basename(keep) + ', starting empty');
+    }
     return emptyDb();
   }
 }
@@ -56,14 +61,18 @@ let writing = Promise.resolve();
 function save() {
   db.meta.updatedAt = new Date().toISOString();
   const data = JSON.stringify(db, null, 2) + '\n';
-  writing = writing.then(() => new Promise((resolve) => {
+  const job = writing.then(() => new Promise((resolve, reject) => {
     const tmp = DB_FILE + '.tmp';
     fs.writeFile(tmp, data, (err) => {
-      if (err) { console.error('[db] write failed:', err.message); return resolve(); }
-      fs.rename(tmp, DB_FILE, (err2) => { if (err2) console.error('[db] rename failed:', err2.message); resolve(); });
+      if (err) { console.error('[db] write failed:', err.message); return reject(err); }
+      fs.rename(tmp, DB_FILE, (err2) => {
+        if (err2) { console.error('[db] rename failed:', err2.message); return reject(err2); }
+        resolve();
+      });
     });
   }));
-  return writing;
+  writing = job.catch(() => {});   // one failed write must not block the queue
+  return job;                      // …but the request that caused it hears about it
 }
 
 function send(res, status, body) {
@@ -89,15 +98,18 @@ async function api(req, res, parts) {
   if (col === 'db' && req.method === 'GET') return send(res, 200, db);
   if (!COLLECTIONS.includes(col)) return send(res, 404, { error: 'unknown collection: ' + col });
   const list = db[col];
-  const id = rawId !== undefined ? decodeURIComponent(rawId) : undefined;
-  const idx = id === undefined ? -1 : list.findIndex(r => String(r.id) === id);
+  let id;
+  try { id = rawId !== undefined ? decodeURIComponent(rawId) : undefined; } catch (e) { return send(res, 400, { error: 'bad id' }); }
+  const find = () => (id === undefined ? -1 : list.findIndex(r => String(r.id) === id));
   const now = new Date().toISOString();
 
   if (req.method === 'GET') {
     if (id === undefined) return send(res, 200, list);
+    const idx = find();
     return idx < 0 ? send(res, 404, { error: 'not found' }) : send(res, 200, list[idx]);
   }
   if (req.method === 'DELETE' && id !== undefined) {
+    const idx = find();
     if (idx < 0) return send(res, 404, { error: 'not found' });
     const [removed] = list.splice(idx, 1); await save();
     return send(res, 200, { removed });
@@ -108,10 +120,12 @@ async function api(req, res, parts) {
 
   if (req.method === 'POST' && id === undefined) {
     const record = { id: body.id || crypto.randomUUID(), createdAt: now, ...body };
+    if (list.some(r => String(r.id) === String(record.id))) return send(res, 409, { error: 'id already exists: ' + record.id });
     list.push(record); await save();
     return send(res, 201, { record });
   }
   if ((req.method === 'PUT' || req.method === 'PATCH') && id !== undefined) {
+    const idx = find();
     const created = idx < 0;
     const base = created ? { id, createdAt: now } : (req.method === 'PATCH' ? list[idx] : { id, createdAt: list[idx].createdAt });
     const record = { ...base, ...body, id, updatedAt: now };
@@ -122,13 +136,20 @@ async function api(req, res, parts) {
   return send(res, 405, { error: 'method not allowed' });
 }
 
+const PRIVATE = new Set(['server.js', 'package.json', 'package-lock.json', 'db.json', 'node_modules']);
 const MIME = { '.html': 'text/html; charset=utf-8', '.json': 'application/json; charset=utf-8', '.js': 'text/javascript',
                '.css': 'text/css', '.png': 'image/png', '.jpg': 'image/jpeg', '.svg': 'image/svg+xml', '.woff2': 'font/woff2' };
 function serveStatic(req, res, urlPath) {
-  let rel = decodeURIComponent(urlPath);
+  let rel;
+  try { rel = decodeURIComponent(urlPath); } catch (e) { res.writeHead(400); return res.end('bad request'); }
+  if (rel.includes('\0')) { res.writeHead(400); return res.end('bad request'); }
   if (rel === '/') { res.writeHead(302, { Location: '/shop/' }); return res.end(); }   // site root → the shop
   let file = path.normalize(path.join(ROOT, rel));
-  if (!file.startsWith(ROOT + path.sep) || path.basename(file).startsWith('.')) { res.writeHead(403); return res.end(); }
+  // only the pages are public: no dot-files/folders at any depth (.git …), no server code, and not the raw
+  // database (customer data is reachable only through /api)
+  const segs = path.relative(ROOT, file).split(path.sep);
+  if (!file.startsWith(ROOT + path.sep) || segs.some(s => s.startsWith('.')) || PRIVATE.has(segs[0])
+      || /\.(tmp|corrupt-\d+)$/.test(file)) { res.writeHead(403); return res.end(); }
   fs.stat(file, (err, st) => {
     if (!err && st.isDirectory()) {
       // a folder (shop/, panel/) serves its index.html; without the trailing slash, redirect so the
@@ -147,10 +168,11 @@ function serveStatic(req, res, urlPath) {
 }
 
 const server = http.createServer((req, res) => {
-  const url = new URL(req.url, 'http://localhost');
+  let url;
+  try { url = new URL(req.url, 'http://localhost'); } catch (e) { res.writeHead(400); return res.end(); }
   const parts = url.pathname.split('/').filter(Boolean);
   if (parts[0] === 'api') {
-    api(req, res, parts.slice(1)).catch((e) => { console.error(e); send(res, 500, { error: 'server error' }); });
+    api(req, res, parts.slice(1)).catch((e) => { console.error(e); if (!res.headersSent) send(res, 500, { error: 'server error' }); });
   } else if (req.method === 'GET' || req.method === 'HEAD') {
     serveStatic(req, res, url.pathname);
   } else { res.writeHead(405); res.end(); }
