@@ -218,6 +218,20 @@ button.row{cursor:pointer} button.row:hover{background:var(--sur2)}
 .kv dt{color:var(--tx2)} .kv dd{margin:0;min-width:0;overflow-wrap:anywhere}
 .box{background:var(--sur2);border-radius:12px;padding:12px 14px;margin-bottom:14px}
 .steps{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px}
+.dlv-h{font-size:15px;margin:0 0 10px}
+.dlv-note{margin:0 0 10px}
+.dlv-av{flex:none;width:36px;height:36px;border-radius:50%;display:grid;place-items:center;font-weight:700;background:var(--p-soft);color:var(--p-ink)}
+.dlv-who{display:grid;gap:2px;min-width:0;flex:1}
+.dlv-cur{display:flex;align-items:center;gap:10px;padding:10px 12px;margin-bottom:10px;border-radius:12px;background:var(--ok-soft);border:1px solid color-mix(in oklab,var(--ok) 30%,transparent)}
+.dlv-list{display:grid;gap:6px;margin-bottom:12px;max-height:240px;overflow:auto}
+.dlv-opt{position:relative;display:flex;align-items:center;gap:10px;padding:10px 12px;border-radius:12px;background:var(--sur);border:1.5px solid var(--line);cursor:pointer;min-height:56px}
+.dlv-opt:hover{border-color:var(--p)}
+.dlv-opt input{position:absolute;opacity:0;inset:0;margin:0;cursor:pointer}
+.dlv-opt:has(input:checked){border-color:var(--p);background:var(--p-soft)}
+.dlv-opt:has(input:focus-visible){outline:2px solid var(--p);outline-offset:2px}
+.dlv-tick{flex:none;width:20px;height:20px;border-radius:50%;border:2px solid var(--line)}
+.dlv-opt:has(input:checked) .dlv-tick{border-color:var(--p);background:var(--p) radial-gradient(circle,var(--on-p) 0 35%,transparent 40%)}
+.dlv-go{width:100%}
 .form{display:grid;grid-template-columns:1fr 1fr;gap:12px 14px}
 .form .full{grid-column:1/-1}
 .form label{display:flex;flex-direction:column;gap:6px;font-size:13px;font-weight:600}
@@ -844,18 +858,35 @@ function stageControl(kind, r, pre) {
   const hist = Array.isArray(r.statusHistory) && r.statusHistory.length ? '<ul class="feed small hist" aria-label="سابقهٔ وضعیت">' + r.statusHistory.slice().reverse().map(h => '<li><span>' + histLabel(h, names) + (h.by ? ' <span class="muted">(' + (h.by === 'customer' ? 'مشتری' : h.by === 'admin' ? 'مدیر' : esc(h.by)) + ')</span>' : '') + '</span><time>' + when(h) + '</time></li>').join('') + '</ul>' : '';
   return '<div class="box"><b>وضعیت</b>' + steps + act + hist + '</div>';
 }
-// delivery: once a record is in stage 2+ the admin picks the technician who delivers it
+// ---- delivery / technician assignment ----
+// Once a record reaches stage 2+, the admin picks the technician who delivers it.
+// Split into small renderers: guard -> (current assignee | picker) so each state is easy to change.
+const deliveryShell = (title, body) => '<section class="box dlv" aria-labelledby="dlv-h"><h3 id="dlv-h" class="dlv-h">' + title + '</h3>' + body + '</section>';
+const techInitial = (t) => esc(String(t.name || '?').trim().charAt(0));
+function assigneeCard(t, o) {
+  return '<div class="dlv-cur"><span class="dlv-av" aria-hidden="true">' + techInitial(t) + '</span><div class="dlv-who"><b>' + esc(t.name) + '</b>'
+    + '<span class="small muted">' + (t.phone ? phoneHtml(t.phone) : '') + (t.phone && o.assignedAt ? ' · ' : '') + (o.assignedAt ? 'ارجاع: ' + when({ at: o.assignedAt }) : '') + '</span></div></div>';
+}
+function techOption(t, o) {
+  const sel = String(t.id) === String(o.technicianId), jobs = openJobs(t).length, off = t.active === false;
+  return '<label class="dlv-opt"><input type="radio" name="tech-pick" value="' + esc(t.id) + '"' + (sel ? ' checked' : '') + '>'
+    + '<span class="dlv-av" aria-hidden="true">' + techInitial(t) + '</span>'
+    + '<span class="dlv-who"><b>' + esc(t.name) + (off ? ' <span class="badge mute">غیرفعال</span>' : '') + '</b><span class="small muted">' + (t.area ? esc(t.area) + ' · ' : '') + (jobs ? fa(jobs) + ' کار باز' : 'بدون کار باز') + '</span></span>'
+    + '<span class="dlv-tick" aria-hidden="true"></span></label>';
+}
+function deliveryPicker(col, o, cur, opts) {
+  return (cur ? assigneeCard(cur, o) : '<p class="small muted dlv-note">هنوز تکنسینی برای این مورد انتخاب نشده است.</p>')
+    + '<div class="dlv-list" role="radiogroup" aria-label="انتخاب تکنسین تحویل">' + opts.map(t => techOption(t, o)).join('') + '</div>'
+    + '<button type="button" class="btn pri dlv-go" data-a="assign" data-col="' + col + '" data-id="' + esc(o.id) + '">' + (cur ? 'تغییر تکنسین' : 'ارجاع برای تحویل') + '</button>';
+}
 function deliveryBox(col, o) {
   if (o.status === 'cancelled' || (col === 'serviceRequests' && o.kind !== 'refill')) return '';
   const cur = o.technicianId ? techOf(o.technicianId) : null, st = +o.stage || 1;
-  const line = cur ? '<div class="small muted" style="margin-top:6px">تحویل‌دهنده: <b>' + esc(cur.name) + '</b>' + (cur.phone ? ' · ' + phoneHtml(cur.phone) : '') + (o.assignedAt ? ' · ' + when({ at: o.assignedAt }) : '') + '</div>' : '';
-  if (st >= 4) return cur ? '<div class="box"><b>تحویل</b>' + line + '</div>' : '';
-  if (st < 2) return '<div class="box"><b>تحویل</b><div class="small muted">پس از ورود به مرحلهٔ «' + esc((STAGES[col === 'orders' ? 'order' : 'refill'])[1]) + '» می‌توانید یک تکنسین برای تحویل انتخاب کنید.</div></div>';
+  if (st >= 4) return cur ? deliveryShell('تحویل', assigneeCard(cur, o)) : '';
+  if (st < 2) return deliveryShell('تحویل', '<p class="small muted dlv-note">پس از ورود به مرحلهٔ «' + esc(STAGES[col === 'orders' ? 'order' : 'refill'][1]) + '» می‌توانید یک تکنسین برای تحویل انتخاب کنید.</p>');
   const opts = DB.technicians.filter(t => t.active !== false || String(t.id) === String(o.technicianId));
-  if (!opts.length) return '<div class="box"><b>تحویل</b><div class="small muted">هنوز تکنسینی ثبت نشده است. <a href="#technicians">افزودن تکنسین</a></div></div>';
-  return '<div class="box"><b>تحویل توسط تکنسین</b><div class="steps" style="margin-top:8px"><select id="tech-pick" aria-label="تکنسین تحویل"><option value="">— انتخاب تکنسین —</option>'
-    + opts.map(t => '<option value="' + esc(t.id) + '"' + (String(t.id) === String(o.technicianId) ? ' selected' : '') + '>' + esc(t.name) + (t.area ? ' — ' + esc(t.area) : '') + '</option>').join('') + '</select>'
-    + '<button class="btn sm pri" data-a="assign" data-col="' + col + '" data-id="' + esc(o.id) + '">' + (cur ? 'تغییر تکنسین' : 'ارجاع برای تحویل') + '</button></div>' + line + '</div>';
+  if (!opts.length) return deliveryShell('تحویل', '<p class="small muted dlv-note">هنوز تکنسینی ثبت نشده است.</p><a class="btn sm" href="#technicians">+ افزودن تکنسین</a>');
+  return deliveryShell('تحویل توسط تکنسین', deliveryPicker(col, o, cur, opts));
 }
 function payBox(o) {
   const p = payOf(o);
@@ -979,8 +1010,8 @@ async function saveTech(form) {
   } else serverFieldErr(form);
 }
 async function assignTech(col, id) {
-  const o = DB[col].find(x => String(x.id) === String(id)), sel = $('#tech-pick', OVS.length ? OVS[OVS.length - 1].wrap : document); if (!o || !sel) return;
-  const t = techOf(sel.value); if (!t) return toast('یک تکنسین انتخاب کنید', 'err');
+  const o = DB[col].find(x => String(x.id) === String(id)), sel = (OVS.length ? OVS[OVS.length - 1].wrap : document).querySelector('input[name="tech-pick"]:checked'); if (!o) return;
+  const t = sel && techOf(sel.value); if (!t) return toast('یک تکنسین انتخاب کنید', 'err');
   if (await write('PATCH', col, id, { technicianId: t.id, technicianName: t.name, assignedAt: new Date().toISOString() })) { logAdmin('ارجاع تحویل', { id: String(id), title: t.name }); toast('به ' + t.name + ' ارجاع شد'); }
   render(); reopen(col, id);
 }
