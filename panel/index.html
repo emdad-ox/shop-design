@@ -155,6 +155,21 @@ a.stat:hover{border-color:var(--p)}
 /* status meters: name + count, thin bar below (track = lighter step of the same hue) */
 .pipes{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:18px}
 .pipes h3{margin:0 0 8px;font-size:13px;font-weight:700;color:var(--tx2)}
+/* pipelines (وضعیت کارها): stacked progress bar + one step tile per stage, cancelled as a chip */
+.pipe{display:grid;gap:10px}
+.pipe-h{display:flex;align-items:baseline;justify-content:space-between;gap:8px}
+.pipe-h h3{margin:0}.pipe-h span{font-size:12px;color:var(--tx2)}
+.seg{display:flex;gap:3px;height:10px;border-radius:999px;overflow:hidden;background:var(--chart-track)}
+.seg i{display:block;height:100%;background:var(--chart);min-width:0}
+.seg i:nth-child(1){opacity:.4}.seg i:nth-child(2){opacity:.62}.seg i:nth-child(3){opacity:.82}
+.steps4{list-style:none;margin:0;padding:0;display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:6px}
+.steps4 li{position:relative;display:grid;gap:2px;justify-items:center;text-align:center;padding:9px 4px;border-radius:10px;background:var(--chart-track)}
+.steps4 li:not(:last-child)::after{content:'‹';position:absolute;inset-inline-end:-6px;top:50%;transform:translateY(-50%);font-size:14px;line-height:1;color:var(--tx2);z-index:1}
+.steps4 .n{display:grid;place-items:center;width:18px;height:18px;border-radius:50%;background:var(--chart);color:#fff;font-size:10px;font-weight:700}
+.steps4 b{font-size:18px;line-height:1.2}
+.steps4 small{font-size:11px;color:var(--tx2);line-height:1.3}
+.steps4 li.done{background:var(--ok-soft)}.steps4 li.done .n{background:var(--ok)}
+.pipe .cx{justify-self:start;font-size:12px;color:var(--tx2);padding:3px 10px;border-radius:999px;border:1px solid var(--line)}
 .meters{display:grid;gap:9px}
 .meter{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:3px 10px;align-items:center;font-size:13px}
 .meter .bar{grid-column:1/-1;height:8px;border-radius:999px;background:var(--chart-track)}
@@ -419,6 +434,13 @@ function revenueChart(paid, days) {
   const xl = bins.map((b, i) => '<span>' + (i === days - 1 ? 'امروز' : (days - 1 - i) % 3 === 0 ? b.d.toLocaleDateString('fa-IR', { day: 'numeric', month: 'short' }) : '') + '</span>').join('');
   return { total, html: '<div class="chart">' + grid + (total ? '<div class="cols">' + cols + '</div>' : '<div class="chart-empty">در ' + fa(days) + ' روز اخیر پرداختی ثبت نشده است</div>') + '</div>' + (total ? '<div class="xl" aria-hidden="true">' + xl + '</div>' : '') };
 }
+function pipeline(title, names, counts, cancelled) {
+  const total = counts.reduce((a, n) => a + n, 0);
+  return '<div class="pipe"><div class="pipe-h"><h3>' + title + '</h3><span class="num">' + fa(total + cancelled) + ' مورد</span></div>'
+    + '<div class="seg" role="img" aria-label="' + esc(title + ': ' + names.map((l, i) => l + ' ' + fa(counts[i])).join('، ')) + '">' + counts.map((n, i) => n ? '<i style="flex:' + n + '"></i>' : '').join('') + '</div>'
+    + '<ol class="steps4">' + names.map((l, i) => '<li' + (i === names.length - 1 ? ' class="done"' : '') + '><span class="n">' + faD(i + 1) + '</span><b class="num">' + fa(counts[i]) + '</b><small>' + l + '</small></li>').join('') + '</ol>'
+    + '<span class="cx">لغو شده: <b class="num">' + fa(cancelled) + '</b></span></div>';
+}
 function meters(rows) {
   const total = rows.reduce((a, r) => a + r[1], 0);
   return '<div class="meters">' + rows.map(([l, n, cx]) => '<div class="meter' + (cx ? ' cx' : '') + '"><span>' + l + '</span><b class="num">' + fa(n) + '</b>'
@@ -464,10 +486,10 @@ V.overview = () => {
   const oSt = (st) => DB.orders.filter(o => o.status !== 'cancelled' && (+o.stage || 1) === st).length;
   const rSt = (f) => DB.serviceRequests.filter(r => r.status !== 'cancelled' && f(+r.stage || 1)).length;
   const trend = '<section class="card pad trend"><div class="sec-h"><h2>درآمد ۱۴ روز اخیر</h2><span class="sum num">' + toman(ch.total) + '</span></div>' + ch.html + '</section>';
+  const canc = (a) => a.filter(r => r.status === 'cancelled').length;
   const status = '<section class="card pad"><div class="sec-h"><h2>وضعیت کارها</h2></div><div class="pipes">'
-    + '<div><h3>سفارش‌ها</h3>' + meters(STAGES.order.map((l, i) => [l, oSt(i + 1)]).concat([['لغو شده', DB.orders.filter(o => o.status === 'cancelled').length, 1]])) + '</div>'
-    + '<div><h3>درخواست‌های خدمت</h3>' + meters([['جدید', rSt(s => s === 1)], ['در حال انجام', rSt(s => s === 2 || s === 3)], ['تکمیل‌شده', rSt(s => s >= 4)],
-        ['لغو شده', DB.serviceRequests.filter(r => r.status === 'cancelled').length, 1]]) + '</div>'
+    + pipeline('سفارش‌ها', STAGES.order, STAGES.order.map((l, i) => oSt(i + 1)), canc(DB.orders))
+    + pipeline('درخواست‌های خدمت', ['جدید', 'بررسی', 'در حال انجام', 'تکمیل‌شده'], [1, 2, 3, 4].map(st => rSt(s => s === st)), canc(DB.serviceRequests))
     + '</div></section>';
 
   // 4) latest orders + requests in one list, and recent activity
