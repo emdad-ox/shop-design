@@ -12,6 +12,7 @@
   "orders": [],
   "payments": [],
   "serviceRequests": [],
+  "technicians": [],
   "products": [
     {
       "id": "oxy40",

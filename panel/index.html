@@ -228,7 +228,7 @@ button.row{cursor:pointer} button.row:hover{background:var(--sur2)}
    server-side authentication.
    ===================================================================================== */
 const API = '../api', LOCAL = 'emdad-prototype:db', ADMIN_PASS = 'emdad-admin';
-const COLS = ['users','sessions','carts','wishlists','addressBooks','orders','payments','serviceRequests','products','services','activity'];
+const COLS = ['users','sessions','carts','wishlists','addressBooks','orders','payments','serviceRequests','products','services','activity','technicians'];
 const CATS = { cyl: 'کپسول طبی', dev: 'دستگاه‌ها', acc: 'لوازم جانبی' };
 const ARTS = { cyl: 'کپسول', dev: 'دستگاه', mano: 'مانومتر', mask: 'ماسک' };
 const STAGES = {
@@ -341,6 +341,7 @@ const NAV = [
   ['overview', 'نمای کلی', 'M3 12l9-9 9 9M5 10v10h14V10'],
   ['orders', 'سفارش‌ها', 'M4 7h16l-1.5 13h-13L4 7zM8 7a4 4 0 0 1 8 0'],
   ['requests', 'درخواست‌های خدمت', 'M9 3h6M12 3v4M8 7h8v13a1 1 0 0 1-1 1H9a1 1 0 0 1-1-1z'],
+  ['technicians', 'تکنسین‌ها', 'M12 12a4 4 0 1 0 0-8 4 4 0 0 0 0 8zM4 21a8 8 0 0 1 16 0'],
   ['payments', 'پرداخت‌ها', 'M3 6h18v13H3zM3 10h18'],
   ['products', 'محصولات', 'M4 4h7v7H4zM13 4h7v7h-7zM4 13h7v7H4zM13 13h7v7h-7z'],
   ['services', 'خدمات', 'M12 3a9 9 0 1 0 0 18 9 9 0 0 0 0-18M12 8v8M8 12h8'],
@@ -502,15 +503,26 @@ V.orders = () => {
   const rows = newest(DB.orders).filter(o => (UI.f === 'all' || (UI.f === 'open' ? isOpen(o) : UI.f === 'done' ? (+o.stage === 4 && o.status !== 'cancelled') : o.status === 'cancelled'))
       && match(o, [o.id, custName(o), o.phone]))
     .map(o => ({ id: o.id, cells: ['<span class="ltr num">' + esc(o.id) + '</span>', esc(custName(o)), '<span class="ltr num">' + esc(o.phone || '—') + '</span>', when(o), '<span class="num">' + toman(o.total) + '</span>',
-      o.paid ? '<span class="badge ok">پرداخت‌شده</span>' : '<span class="badge warn">پرداخت‌نشده</span>', stageBadge('order', o)] }));
+      o.paid ? '<span class="badge ok">پرداخت‌شده</span>' : '<span class="badge warn">پرداخت‌نشده</span>', o.technicianName ? esc(o.technicianName) : '<span class="muted">—</span>', stageBadge('order', o)] }));
   return shell('سفارش‌ها', '', filterBar([['all', 'همه'], ['open', 'در جریان'], ['done', 'تحویل‌شده'], ['cancelled', 'لغوشده']])
-    + '<section class="card pad">' + table(['شماره', 'مشتری', 'تلفن', 'زمان', 'مبلغ', 'پرداخت', 'وضعیت'], rows, 'order') + '</section>');
+    + '<section class="card pad">' + table(['شماره', 'مشتری', 'تلفن', 'زمان', 'مبلغ', 'پرداخت', 'تکنسین', 'وضعیت'], rows, 'order') + '</section>');
 };
 V.requests = () => {
   const rows = newest(DB.serviceRequests).filter(r => (UI.f === 'all' || UI.f === r.kind || (UI.f === 'open' && isOpen(r))) && match(r, [r.id, custName(r), r.phone]))
     .map(r => ({ id: r.id, cells: ['<span class="ltr num">' + esc(r.id) + '</span>', '<span class="badge ' + (r.kind === 'refill' ? 'acc' : '') + '">' + esc(KIND[r.kind] || r.kind) + '</span>', esc(custName(r)), when(r), esc(r.delivery || '—'), stageBadge(r.kind, r)] }));
   return shell('درخواست‌های خدمت', '', filterBar([['all', 'همه'], ['open', 'باز'], ['refill', 'شارژ کپسول'], ['used', 'تجهیزات']])
     + '<section class="card pad">' + table(['کد', 'نوع', 'مشتری', 'زمان', 'زمان تحویل', 'وضعیت'], rows, 'request') + '</section>');
+};
+const techOf = (id) => (DB.technicians || []).find(t => String(t.id) === String(id));
+V.technicians = () => {
+  const cnt = (t, f) => DB.orders.filter(o => String(o.technicianId) === String(t.id) && o.status !== 'cancelled' && f(+o.stage || 1)).length;
+  const rows = (DB.technicians || []).filter(t => match(t, [t.name, t.phone, t.area]))
+    .map(t => ({ id: t.id, cells: ['<b>' + esc(t.name) + '</b>', '<span class="ltr num">' + esc(t.phone || '—') + '</span>', esc(t.area || '—'),
+        '<span class="num">' + fa(cnt(t, s => s < 4)) + '</span>', '<span class="num">' + fa(cnt(t, s => s === 4)) + '</span>', t.active === false ? '<span class="badge mute">غیرفعال</span>' : '<span class="badge ok">فعال</span>'] }));
+  return shell('تکنسین‌ها', '<button class="btn pri" data-a="tech-new">+ افزودن تکنسین</button>',
+    '<div class="tools"><input class="search" type="search" id="q" placeholder="جستجو: نام، تلفن یا منطقه…" aria-label="جستجوی تکنسین" value="' + esc(UI.q) + '"></div>'
+    + '<section class="card pad"><p class="small muted" style="margin-top:0">تکنسین‌ها کسانی هستند که سفارش‌های تأییدشده را به مشتری تحویل می‌دهند. پس از تأیید سفارش، در جزئیات آن یکی از تکنسین‌ها را برای تحویل انتخاب کنید.</p>'
+    + table(['نام', 'تلفن', 'منطقه', 'تحویل در جریان', 'تحویل‌شده', 'وضعیت'], rows, 'tech') + '</section>');
 };
 V.payments = () => {
   const list = newest(DB.payments).filter(p => match(p, [p.id, p.orderNo, custName(p)]));
@@ -575,12 +587,24 @@ function stageControl(kind, r, act) {
     + names.map((n, i) => '<button class="chip" data-a="' + act + '" data-id="' + esc(r.id) + '" data-st="' + (i + 1) + '" aria-pressed="' + (cur === String(i + 1)) + '">' + faD(i + 1) + '. ' + esc(n) + '</button>').join('')
     + '<button class="chip" data-a="' + act + '" data-id="' + esc(r.id) + '" data-st="x" aria-pressed="' + (cur === 'x') + '" style="color:var(--err)">لغو</button></div>'
     + '<div class="small muted">با انتخاب وضعیت، تغییر بلافاصله در اپ مشتری نمایش داده می‌شود.</div>'
-    + (Array.isArray(r.statusHistory) && r.statusHistory.length ? '<ul class="feed small" style="margin-top:8px">' + r.statusHistory.slice().reverse().map(h => '<li><span>' + (h.status === 'cancelled' ? 'لغو شد' : esc(names[(+h.stage || 1) - 1])) + '</span><time>' + when(h) + '</time></li>').join('') + '</ul>' : '') + '</div>';
+    + (Array.isArray(r.statusHistory) && r.statusHistory.length ? '<ul class="feed small" style="margin-top:8px">' + r.statusHistory.slice().reverse().map(h => '<li><span>' + (h.technicianName ? 'ارجاع به تکنسین: ' + esc(h.technicianName) : h.status === 'cancelled' ? 'لغو شد' : esc(names[(+h.stage || 1) - 1])) + '</span><time>' + when(h) + '</time></li>').join('') + '</ul>' : '') + '</div>';
+}
+// delivery: once an order is confirmed (stage 2+, not cancelled) the admin picks the technician who delivers it
+function deliveryBox(o) {
+  if (o.status === 'cancelled') return '';
+  const cur = o.technicianId ? techOf(o.technicianId) : null;
+  if ((+o.stage || 1) < 2) return '<div class="box"><b>تحویل</b><div class="small muted">پس از تأیید سفارش (وضعیت «در حال آماده‌سازی») می‌توانید یک تکنسین برای تحویل انتخاب کنید.</div></div>';
+  const opts = (DB.technicians || []).filter(t => t.active !== false || String(t.id) === String(o.technicianId));
+  if (!opts.length) return '<div class="box"><b>تحویل</b><div class="small muted">هنوز تکنسینی ثبت نشده است. <a href="#technicians">افزودن تکنسین</a></div></div>';
+  return '<div class="box"><b>تحویل توسط تکنسین</b><div class="steps" style="margin-top:8px"><select id="tech-pick" aria-label="تکنسین تحویل"><option value="">— انتخاب تکنسین —</option>'
+    + opts.map(t => '<option value="' + esc(t.id) + '"' + (String(t.id) === String(o.technicianId) ? ' selected' : '') + '>' + esc(t.name) + (t.area ? ' — ' + esc(t.area) : '') + '</option>').join('') + '</select>'
+    + '<button class="btn sm pri" data-a="order-assign" data-id="' + esc(o.id) + '">' + (cur ? 'تغییر تکنسین' : 'ارجاع برای تحویل') + '</button></div>'
+    + (cur ? '<div class="small muted" style="margin-top:6px">تحویل‌دهنده: <b>' + esc(cur.name) + '</b>' + (cur.phone ? ' · <span class="ltr num">' + esc(cur.phone) + '</span>' : '') + (o.assignedAt ? ' · ' + when({ at: o.assignedAt }) : '') + '</div>' : '') + '</div>';
 }
 function showOrder(id) {
   const o = DB.orders.find(x => String(x.id) === String(id)); if (!o) return toast('سفارش پیدا نشد');
   const items = (o.items || []).map(i => '<tr><td>' + esc(i.title) + '</td><td class="num">×' + fa(i.qty) + '</td><td class="num">' + toman(i.line) + '</td></tr>').join('');
-  openOverlay(head('سفارش <span class="ltr num">' + esc(o.id) + '</span>') + stageControl('order', o, 'order-stage')
+  openOverlay(head('سفارش <span class="ltr num">' + esc(o.id) + '</span>') + stageControl('order', o, 'order-stage') + deliveryBox(o)
     + '<dl class="kv"><dt>مشتری</dt><dd>' + esc(custName(o)) + '</dd><dt>تلفن</dt><dd><span class="ltr num">' + esc(o.phone || '—') + '</span></dd><dt>زمان ثبت</dt><dd>' + when(o) + '</dd>'
     + '<dt>آدرس</dt><dd>' + esc((o.addrTitle ? o.addrTitle + ' — ' : '') + (o.addrText || '—')) + '</dd><dt>زمان تحویل</dt><dd>' + esc(o.delivery || '—') + '</dd>' + (o.note ? '<dt>یادداشت</dt><dd>' + esc(o.note) + '</dd>' : '') + '</dl>'
     + '<div class="box"><b>اقلام</b><div class="tbl"><table><tbody>' + (items || '<tr><td class="muted">—</td></tr>') + '</tbody></table></div>'
@@ -637,6 +661,36 @@ function serviceForm(id) {
     + (v.builtIn ? '<p class="full small muted">این خدمت فرم اختصاصی دارد و قابل حذف نیست؛ می‌توانید عنوان و نمایش آن را تغییر دهید.</p>' : '')
     + '<div class="full err-msg" id="sf-err" role="alert"></div>'
     + '<div class="full actions">' + (id && !v.builtIn ? '<button type="button" class="btn dan" data-a="service-del" data-id="' + esc(id) + '">حذف</button>' : '') + '<button type="button" class="btn" data-a="close">انصراف</button><button type="submit" class="btn pri">ذخیره</button></div></form>', 'modal');
+}
+function techForm(id) {
+  const t = id ? techOf(id) : { active: true }; if (!t) return;
+  openOverlay(head(id ? 'ویرایش تکنسین' : 'افزودن تکنسین') + '<form id="tf" class="form" novalidate data-id="' + esc(id || '') + '">'
+    + '<label class="full">نام و نام خانوادگی<input type="text" name="name" required value="' + esc(t.name) + '"></label>'
+    + '<label>تلفن<input type="tel" name="phone" dir="ltr" inputmode="numeric" value="' + esc(t.phone) + '" placeholder="09123456789"></label>'
+    + '<label>منطقه / محدودهٔ فعالیت<input type="text" name="area" value="' + esc(t.area) + '"></label>'
+    + '<label class="check"><input type="checkbox" name="active"' + (t.active !== false ? ' checked' : '') + '> فعال (قابل ارجاع سفارش)</label>'
+    + '<div class="full err-msg" id="tf-err" role="alert"></div>'
+    + '<div class="full actions">' + (id ? '<button type="button" class="btn dan" data-a="tech-del" data-id="' + esc(id) + '">حذف</button>' : '') + '<button type="button" class="btn" data-a="close">انصراف</button><button type="submit" class="btn pri">ذخیره</button></div></form>', 'modal');
+}
+async function saveTech(form) {
+  const f = new FormData(form), id = form.dataset.id, name = String(f.get('name') || '').trim();
+  const phone = String(f.get('phone') || '').trim().replace(/[۰-۹]/g, d => '۰۱۲۳۴۵۶۷۸۹'.indexOf(d));
+  if (name.length < 2) { $('#tf-err').textContent = 'نام تکنسین را وارد کنید'; return; }
+  if (phone && !/^0?9\d{9}$/.test(phone)) { $('#tf-err').textContent = 'شمارهٔ تلفن همراه نامعتبر است'; return; }
+  const body = { name, phone, area: String(f.get('area') || '').trim(), active: !!f.get('active') };
+  const tid = id || ('t_' + Date.now().toString(36));
+  if (await write(id ? 'PATCH' : 'PUT', 'technicians', tid, body)) {
+    if (id) for (const o of DB.orders.filter(o => String(o.technicianId) === String(id) && o.technicianName !== name)) await write('PATCH', 'orders', o.id, { technicianName: name });
+    logAdmin(id ? 'ویرایش تکنسین' : 'افزودن تکنسین', { id: tid, name }); closeOverlay(); toast('تکنسین ذخیره شد'); render();
+  }
+}
+async function assignTech(orderId) {
+  const o = DB.orders.find(x => String(x.id) === String(orderId)), sel = $('#tech-pick'); if (!o || !sel) return;
+  const t = techOf(sel.value); if (!t) return toast('یک تکنسین انتخاب کنید');
+  const at = new Date().toISOString(), hist = (Array.isArray(o.statusHistory) ? o.statusHistory : []).concat([{ technicianId: t.id, technicianName: t.name, stage: o.stage || 1, at, by: 'admin' }]);
+  if (await write('PATCH', 'orders', orderId, { technicianId: t.id, technicianName: t.name, assignedAt: at, statusHistory: hist })) {
+    logAdmin('ارجاع تحویل سفارش', { id: String(orderId), technician: t.name }); toast('سفارش به ' + t.name + ' ارجاع شد'); render(); showOrder(orderId);
+  }
 }
 function recordForm(formId, title, id, fields) {
   openOverlay(head(title) + '<form id="' + formId + '" class="form" novalidate data-id="' + esc(id) + '">' + fields.map(([name, label, value, type]) =>
@@ -735,6 +789,11 @@ const ACTIONS = {
   'request-del-ok': async (el) => { if (await write('DELETE', 'serviceRequests', el.dataset.id)) { logAdmin('حذف درخواست', { id: el.dataset.id }); closeOverlay(); toast('درخواست حذف شد'); render(); } },
   'user-del': (el) => confirmBox('کاربر «' + esc((userOf(el.dataset.id) || {}).name || el.dataset.id) + '» حذف شود؟ اگر در اپ وارد شده باشد، از حسابش خارج می‌شود. سفارش‌ها و درخواست‌هایش برای سابقه باقی می‌مانند.', 'user-del-ok', el.dataset.id),
   'user-del-ok': async (el) => { if (await write('DELETE', 'users', el.dataset.id)) { logAdmin('حذف کاربر', { id: el.dataset.id }); closeOverlay(); toast('کاربر حذف شد'); render(); } },
+  tech: (el) => techForm(el.dataset.id),
+  'tech-new': () => techForm(null),
+  'tech-del': (el) => confirmBox('تکنسین «' + esc((techOf(el.dataset.id) || {}).name) + '» حذف شود؟ سفارش‌هایی که به او ارجاع شده‌اند نام او را نگه می‌دارند.', 'tech-del-ok', el.dataset.id),
+  'tech-del-ok': async (el) => { if (await write('DELETE', 'technicians', el.dataset.id)) { logAdmin('حذف تکنسین', { id: el.dataset.id }); closeOverlay(); toast('تکنسین حذف شد'); render(); } },
+  'order-assign': (el) => assignTech(el.dataset.id),
   'side-toggle': () => toggleSide(),
   go: (el) => { VIEW = el.dataset.view; UI = { q: '', f: el.dataset.f || 'all' }; if (location.hash.slice(1) === VIEW) render(); else location.hash = VIEW; },
   'side-close': () => toggleSide(false),
@@ -765,7 +824,7 @@ document.addEventListener('keydown', (e) => {
   if ((e.key === 'Enter' || e.key === ' ') && e.target.matches('tr[data-a]')) { e.preventDefault(); ACTIONS[e.target.dataset.a](e.target); }
 });
 document.addEventListener('input', (e) => { if (e.target.id === 'q') { UI.q = e.target.value; render(); } });
-document.addEventListener('submit', (e) => { e.preventDefault(); const id = e.target.id; if (id === 'pf') saveProduct(e.target); else if (id === 'sf') saveService(e.target); else if (id === 'of' || id === 'rf' || id === 'uf') saveRecord(e.target); });
+document.addEventListener('submit', (e) => { e.preventDefault(); const id = e.target.id; if (id === 'tf') saveTech(e.target); else if (id === 'pf') saveProduct(e.target); else if (id === 'sf') saveService(e.target); else if (id === 'of' || id === 'rf' || id === 'uf') saveRecord(e.target); });
 
 // ---------- sign-in gate (demo) & boot ----------
 function loginView(err) {
