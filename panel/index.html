@@ -232,6 +232,7 @@ button.row{cursor:pointer} button.row:hover{background:var(--sur2)}
 .dlv-tick{flex:none;width:20px;height:20px;border-radius:50%;border:2px solid var(--line)}
 .dlv-opt:has(input:checked) .dlv-tick{border-color:var(--p);background:var(--p) radial-gradient(circle,var(--on-p) 0 35%,transparent 40%)}
 .dlv-go{width:100%}
+.dlv-add{width:100%;margin-top:8px}
 .form{display:grid;grid-template-columns:1fr 1fr;gap:12px 14px}
 .form .full{grid-column:1/-1}
 .form label{display:flex;flex-direction:column;gap:6px;font-size:13px;font-weight:600}
@@ -877,15 +878,18 @@ function techOption(t, o) {
 function deliveryPicker(col, o, cur, opts) {
   return (cur ? assigneeCard(cur, o) : '<p class="small muted dlv-note">هنوز تکنسینی برای این مورد انتخاب نشده است.</p>')
     + '<div class="dlv-list" role="radiogroup" aria-label="انتخاب تکنسین تحویل">' + opts.map(t => techOption(t, o)).join('') + '</div>'
-    + '<button type="button" class="btn pri dlv-go" data-a="assign" data-col="' + col + '" data-id="' + esc(o.id) + '">' + (cur ? 'تغییر تکنسین' : 'ارجاع برای تحویل') + '</button>';
+    + '<button type="button" class="btn pri dlv-go" data-a="assign" data-col="' + col + '" data-id="' + esc(o.id) + '">' + (cur ? 'تغییر تکنسین' : 'ارجاع برای تحویل') + '</button>'
+    + newTechBtn(col, o);
 }
+// adds a technician without leaving the order/request: the form opens on top and returns here with the new technician selected
+const newTechBtn = (col, o) => '<button type="button" class="btn sm dlv-add" data-a="tech-new" data-col="' + col + '" data-id="' + esc(o.id) + '">+ افزودن تکنسین جدید</button>';
 function deliveryBox(col, o) {
   if (o.status === 'cancelled' || (col === 'serviceRequests' && o.kind !== 'refill')) return '';
   const cur = o.technicianId ? techOf(o.technicianId) : null, st = +o.stage || 1;
   if (st >= 4) return cur ? deliveryShell('تحویل', assigneeCard(cur, o)) : '';
   if (st < 2) return deliveryShell('تحویل', '<p class="small muted dlv-note">پس از ورود به مرحلهٔ «' + esc(STAGES[col === 'orders' ? 'order' : 'refill'][1]) + '» می‌توانید یک تکنسین برای تحویل انتخاب کنید.</p>');
   const opts = DB.technicians.filter(t => t.active !== false || String(t.id) === String(o.technicianId));
-  if (!opts.length) return deliveryShell('تحویل', '<p class="small muted dlv-note">هنوز تکنسینی ثبت نشده است.</p><a class="btn sm" href="#technicians">+ افزودن تکنسین</a>');
+  if (!opts.length) return deliveryShell('تحویل', '<p class="small muted dlv-note">هنوز تکنسینی ثبت نشده است.</p>' + newTechBtn(col, o));
   return deliveryShell('تحویل توسط تکنسین', deliveryPicker(col, o, cur, opts));
 }
 function payBox(o) {
@@ -983,16 +987,17 @@ function serviceForm(id) {
     + (v.builtIn ? '<p class="full small muted">این خدمت فرم اختصاصی دارد و قابل حذف نیست؛ می‌توانید عنوان و نمایش آن را تغییر دهید.</p>' : '')
     + formEnd('sf', id && !v.builtIn ? '<button type="button" class="btn dan" data-a="service-del" data-id="' + esc(id) + '">حذف</button>' : ''), 'modal');
 }
-function techForm(id) {
+function techForm(id, back) {
   const t = id ? techOf(id) : { active: true }; if (!t) return;
   const jobs = id ? openJobs(t).length : 0;
-  openOverlay(id ? 'ویرایش تکنسین' : 'افزودن تکنسین', '<form id="tf" class="form" novalidate data-id="' + esc(id || '') + '">'
+  openOverlay(id ? 'ویرایش تکنسین' : 'افزودن تکنسین', '<form id="tf" class="form" novalidate data-id="' + esc(id || '') + '"'
+    + (back ? ' data-back-col="' + esc(back.col) + '" data-back-id="' + esc(back.id) + '"' : '') + '>'
     + lbl('نام و نام خانوادگی', 'name', t.name, { cls: 'full', req: 1 })
     + '<label>تلفن<input type="tel" name="phone" dir="ltr" inputmode="numeric" autocomplete="off" value="' + esc(t.phone) + '" placeholder="09123456789"></label>'
     + lbl('منطقه / محدودهٔ فعالیت', 'area', t.area)
     + '<label class="check"><input type="checkbox" name="active"' + (t.active !== false ? ' checked' : '') + '> فعال (قابل ارجاع)</label>'
     + (jobs ? '<p class="full small muted">این تکنسین ' + fa(jobs) + ' کار باز دارد؛ غیرفعال‌کردن او کارهای فعلی را تغییر نمی‌دهد.</p>' : '')
-    + formEnd('tf', id ? '<button type="button" class="btn dan" data-a="tech-del" data-id="' + esc(id) + '">حذف</button>' : ''), 'modal');
+    + formEnd('tf', id ? '<button type="button" class="btn dan" data-a="tech-del" data-id="' + esc(id) + '">حذف</button>' : ''), 'modal', back ? { stack: true } : {});
 }
 async function saveTech(form) {
   clearErrs(form);
@@ -1006,7 +1011,14 @@ async function saveTech(form) {
   if (await write(id ? 'PATCH' : 'POST', 'technicians', id ? tid : null, id ? body : { id: tid, ...body }, { inline: true })) {
     if (id) { const jobs = DB.orders.map(o => ['orders', o]).concat(DB.serviceRequests.map(r => ['serviceRequests', r])).filter(([, o]) => String(o.technicianId) === String(id) && o.technicianName !== name && isOpen(o));
       for (const [c, o] of jobs) await write('PATCH', c, o.id, { technicianName: name }); }   // the name is resolved by id at render time; the denormalised copy of open jobs is kept for the app
-    logAdmin(id ? 'ویرایش تکنسین' : 'افزودن تکنسین', { id: tid, title: name }); render(); closeAll(); toast('تکنسین ذخیره شد');
+    logAdmin(id ? 'ویرایش تکنسین' : 'افزودن تکنسین', { id: tid, title: name }); render(); closeAll(true);
+    const bc = form.dataset.backCol, bi = form.dataset.backId;
+    if (bc && DB[bc] && DB[bc].some(x => String(x.id) === String(bi))) {
+      reopen(bc, bi);
+      const r = OVS.length && OVS[OVS.length - 1].wrap.querySelector('input[name="tech-pick"][value="' + CSS.escape(tid) + '"]');
+      if (r) { r.checked = true; r.focus(); }
+      toast('تکنسین ذخیره شد؛ برای ارجاع، «' + (r && r.closest('.dlv').querySelector('.dlv-go').textContent || 'ارجاع') + '» را بزنید');
+    } else { const t = $('#page-h'); if (t) t.focus({ preventScroll: true }); toast('تکنسین ذخیره شد'); }
   } else serverFieldErr(form);
 }
 async function assignTech(col, id) {
@@ -1153,7 +1165,7 @@ const ACTIONS = {
   'request-del': (el) => delFlow('serviceRequests', el.dataset.id, { title: 'حذف درخواست؟', log: 'حذف درخواست', done: 'درخواست حذف شد', text: '<p>درخواست <span class="ltr num">' + esc(el.dataset.id) + '</span> حذف می‌شود و از فهرست درخواست‌های مشتری در اپلیکیشن هم برداشته می‌شود.</p>' }),
   'user-del': (el) => delFlow('users', el.dataset.id, { title: 'حذف کاربر؟', log: 'حذف کاربر', done: 'کاربر حذف شد', text: '<p>کاربر «' + esc((userOf(el.dataset.id) || {}).name || el.dataset.id) + '» حذف می‌شود: سبد، علاقه‌مندی‌ها، دفترچهٔ آدرس و نشست‌های او پاک و ورود فعلی‌اش باطل می‌شود. سفارش‌ها و درخواست‌هایش برای سابقه باقی می‌مانند.</p>' }),
   tech: (el) => techForm(el.dataset.id),
-  'tech-new': () => techForm(null),
+  'tech-new': (el) => techForm(null, el.dataset.col ? { col: el.dataset.col, id: el.dataset.id } : null),
   'tech-del': (el) => { const t = techOf(el.dataset.id) || {}, n = DB ? openJobs(t).length : 0;
     delFlow('technicians', el.dataset.id, { title: 'حذف تکنسین؟', log: 'حذف تکنسین', done: 'تکنسین حذف شد', text: '<p>تکنسین «' + esc(t.name) + '» حذف می‌شود و ارجاع او از سفارش‌ها و درخواست‌ها برداشته می‌شود (نام او در سفارش‌های قبلی می‌ماند).</p>' + (n ? '<p><b>' + fa(n) + ' کار باز</b> به او ارجاع شده است؛ پیش از حذف آن‌ها را به تکنسین دیگری بدهید.</p>' : '') }); },
   'side-toggle': () => toggleSide(),
